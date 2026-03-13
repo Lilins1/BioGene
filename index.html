@@ -2,8 +2,8 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>基因克隆全流程仿真系统 - OOP 重构版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>基因克隆全流程仿真系统 - 重构版</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -13,12 +13,10 @@
                 <h2 id="step-title">交互操作区 - 步骤 1：圆环切割</h2>
                 <p id="status-text">请在下方圆环上点击选择切割位点（红线）</p>
             </div>
-            
             <div id="selector-container">
                 <canvas id="circularCanvas" width="500" height="500"></canvas>
                 <canvas id="linearCanvas" width="500" height="500" style="display:none;"></canvas>
             </div>
-
             <div class="control-bar">
                 <button id="btn-cut" class="btn primary">✂️ 执行切割 / 提取</button>
             </div>
@@ -26,18 +24,24 @@
 
         <div id="right-panel">
             <div class="panel-header">
-                <h2>3D 仿真预览 (上下拖拽鼠标控制形变)</h2>
+                <h2>3D 仿真预览 (拖拽鼠标控制形变)</h2>
             </div>
-            
             <div id="preview-container">
                 <canvas id="previewCanvas" width="800" height="800"></canvas>
             </div>
-
             <div class="control-bar action-bar">
-                <button id="btn-reset" class="btn danger">重置实验 (Reset)</button>
-                <button id="btn-rotate" class="btn secondary">🔄 旋转片段 (Rotate 180°)</button>
-                <button id="btn-ligate" class="btn success">🔗 检查并拼合 (Ligate)</button>
+                <button id="btn-reset" class="btn danger">重置 (Reset)</button>
+                <button id="btn-rotate" class="btn secondary">🔄 旋转片段</button>
+                <button id="btn-ligate" class="btn success">🔗 检查并拼合</button>
             </div>
+        </div>
+    </div>
+
+    <div id="modal-overlay">
+        <div id="modal-box">
+            <h3 id="modal-title">实验提示</h3>
+            <div id="modal-body"></div>
+            <button id="modal-close" class="btn primary">开始实验</button>
         </div>
     </div>
 
