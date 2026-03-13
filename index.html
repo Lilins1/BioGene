@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>基因克隆全流程仿真系统 - 重构版</title>
+    <title>基因克隆全流程仿真系统</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -31,7 +31,8 @@
             </div>
             <div class="control-bar action-bar">
                 <button id="btn-reset" class="btn danger">重置 (Reset)</button>
-                <button id="btn-rotate" class="btn secondary">🔄 旋转片段</button>
+                <button id="btn-rotate-z" class="btn secondary">🔄 平面旋转</button>
+                <button id="btn-rotate-y" class="btn secondary">↔️ 水平翻转</button>
                 <button id="btn-ligate" class="btn success">🔗 检查并拼合</button>
             </div>
         </div>
@@ -41,7 +42,7 @@
         <div id="modal-box">
             <h3 id="modal-title">实验提示</h3>
             <div id="modal-body"></div>
-            <button id="modal-close" class="btn primary">开始实验</button>
+            <button id="modal-close" class="btn primary">我知道了</button>
         </div>
     </div>
 
