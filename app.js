@@ -561,7 +561,8 @@ class MainApp {
     resetState() {
         this.appStep = 1; 
         
-        document.getElementById('input-step-label').innerText = "当前操作：载体序列";
+        document.getElementById('input-step-label').innerText = "请在下方序列上点击（-）连字符位置选择切割位点。";
+        document.getElementById('status-text').innerText = "当前操作：载体序列";
         document.getElementById('input-top-seq').value = this.circTop;
         document.getElementById('input-bot-seq').value = this.circBot;
 
@@ -584,8 +585,8 @@ class MainApp {
         );
         this.plasmidPanel.setStaticState("extract", 0.0);
         
-        document.getElementById('step-title').innerText = "交互操作区 - 步骤 1：圆环切割";
-        document.getElementById('status-text').innerText = "请在下方序列上点击（-）连字符位置选择切割位点。";
+        document.getElementById('step-title').innerText = "交互操作区 - 步骤 载体切割";
+        document.getElementById('status-text').innerText = "";
         this.showModal("欢迎来到基因克隆仿真实验", "<b>第一步：准备载体</b><br>您可以在左侧面板自定义载体序列（输入 ATCG 等字母会自动插入排版连接符，而像 'Gene' 等单词会被视为整体保持完整，无法被切断）。<br><br>请在红线上点击选定一个将要被抛弃的区域，执行切割！");
     }
 
@@ -614,7 +615,8 @@ class MainApp {
             );
             
             this.appStep = 2; 
-            document.getElementById('input-step-label').innerText = "当前操作：线性片段序列";
+            document.getElementById('input-step-label').innerText = "请在下方序列上点击（-）连字符位置选择切割位点。";
+            document.getElementById('status-text').innerText = "当前操作：线性片段序列";
             document.getElementById('input-top-seq').value = this.linTop;
             document.getElementById('input-bot-seq').value = this.linBot;
 
