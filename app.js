@@ -1,64 +1,37 @@
-/**
- * 基因克隆全流程仿真系统 - 精度增强版
- * 修复：内外环衔接间隙、强制连字符间隔
- */
-
 // ==========================================
-// 1. 增强型辅助工具函数
+// 辅助工具函数
 // ==========================================
-
-// 将普通字符串转化为带 '-' 的规范格式
-function formatSeq(seq) {
-    if (!seq) return "";
-    // 移除已有横杠后重新组合，确保每个碱基间仅有一个横杠
-    let clean = seq.replace(/-/g, "").split("");
-    return clean.join("-");
-}
-
-// 提取序列中的碱基标记（支持 5', 3' 和单个碱基或横杠）
-function getTokens(text) {
-    if (!text) return [];
-    // 匹配 5', 3' 或单个字母/符号
-    return text.match(/5'|3'|[-]|[A-Z]/g) || [];
-}
-
-// 清除所有格式化符号，仅保留碱基用于逻辑判断
-function cleanForLogic(seq) {
-    return seq.replace(/[^ATCG]/g, "");
-}
-
-// 互补配对检查
+function formatSeq(seq) { return seq ? seq.replace(/-/g, "").split("").join("-") : ""; }
+function cleanSeq(seq) { return seq ? seq.replace(/-/g, "").replace(/5'/g, "").replace(/3'/g, "").trim() : ""; }
+function getTokens(text) { return (text || "").match(/5'|3'|\.{2,}|./g) || []; }
 function isComplementary(top, bot) {
-    let t = cleanForLogic(top);
-    let b = cleanForLogic(bot);
-    if (t.length !== b.length || t.length === 0) return false;
-    for (let i = 0; i < t.length; i++) {
-        let tc = t[i], bc = b[i];
-        if (!((tc==='A'&&bc==='T')||(tc==='T'&&bc==='A')||(tc==='C'&&bc==='G')||(tc==='G'&&bc==='C'))) return false;
+    if (top.length !== bot.length || top.length === 0) return false;
+    for (let i = 0; i < top.length; i++) {
+        let t = top[i], b = bot[i];
+        if (!((t==='A'&&b==='T')||(t==='T'&&b==='A')||(t==='C'&&b==='G')||(t==='G'&&b==='C'))) return false;
     }
     return true;
 }
 
 // ==========================================
-// 2. PlasmidPanel (3D 形变渲染核心)
+// 类：3D 形变渲染区
 // ==========================================
 class PlasmidPanel {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
-        this.ctx = this.canvas.getContext('2d');
+        this.ctx = this.canvas.getContext('2d', { alpha: false }); 
         
-        this.vectorColor = "rgba(168, 230, 207, 1.0)"; // 提高不透明度
-        this.fragmentColor = "rgba(255, 180, 130, 1.0)";
-        this.degPerToken = 3.0; // 调小间距使序列更紧凑
+        this.vectorColor = "rgba(168, 230, 207, 0.85)";
+        this.fragmentColor = "rgba(255, 180, 130, 0.85)";
+        this.degPerToken = 3.0;
         this.centerTheta = 90.0;
         this.SCALE = 220.0;
         this.CX = 400; this.CY = 400;
 
         this.mode = "extract";
         this.progress = 0.0;
-        this.extractDistance = 0.55;
-        this.insertDistance = 0.55;
-        
+        this.extractDistance = 0.5;
+        this.insertDistance = 0.5;
         this.rotationAngle = 0.0;
         this.isRotating = false;
         this.isSelfLigating = false;
@@ -71,21 +44,83 @@ class PlasmidPanel {
         this.setupInteractions();
     }
 
+    setSequences(fT, fB, vLT, vLB, vRT, vRB) {
+        this.fragTop = fT; this.fragBot = fB;
+        this.vecLTop = vLT; this.vecLBot = vLB;
+        this.vecRTop = vRT; this.vecRBot = vRB;
+        this.paint();
+    }
+
+    setStaticState(mode, progress) {
+        this.mode = mode; this.progress = progress; this.isSelfLigating = false; this.paint();
+    }
+
+    startRotationAnimation(onComplete) {
+        if (this.isRotating || this.isSelfLigating) return;
+        this.isRotating = true;
+        let start = performance.now();
+        const animate = (time) => {
+            let p = (time - start) / 600.0;
+            if (p >= 1.0) {
+                this.isRotating = false;
+                this.rotationAngle = 0;
+                let nT = getTokens(this.fragBot).reverse().join('');
+                let nB = getTokens(this.fragTop).reverse().join('');
+                this.fragTop = nT; this.fragBot = nB;
+                if(onComplete) onComplete(nT, nB);
+                this.paint();
+            } else {
+                this.rotationAngle = p * 180;
+                this.paint();
+                requestAnimationFrame(animate);
+            }
+        };
+        requestAnimationFrame(animate);
+    }
+
+    startSelfLigationAnimation() {
+        if (this.isSelfLigating || this.isRotating) return;
+        this.isSelfLigating = true;
+        this.selfLigationProgress = 0;
+        let start = performance.now();
+        const animate = (time) => {
+            let p = (time - start) / 1000.0;
+            if (p >= 1.0) {
+                this.selfLigationProgress = 1.0;
+                this.paint();
+            } else {
+                this.selfLigationProgress = p;
+                this.paint();
+                requestAnimationFrame(animate);
+            }
+        };
+        requestAnimationFrame(animate);
+    }
+
     setupInteractions() {
         let isDown = false, lastY = 0;
         this.canvas.addEventListener('mousedown', e => { isDown = true; lastY = e.clientY; });
+        this.canvas.addEventListener('touchstart', e => { isDown = true; lastY = e.touches[0].clientY; }, {passive: false});
+        
         window.addEventListener('mouseup', () => isDown = false);
-        this.canvas.addEventListener('mousemove', e => {
+        window.addEventListener('touchend', () => isDown = false);
+        
+        const moveHandler = y => {
             if (!isDown || this.isRotating || this.isSelfLigating) return;
-            let delta = (e.clientY - lastY) / 300.0;
+            let delta = (y - lastY) / 300.0; 
             this.progress += (this.mode === "extract") ? -delta : delta;
             this.progress = Math.max(0.0, Math.min(1.0, this.progress));
-            lastY = e.clientY;
+            lastY = y;
             this.paint();
-        });
+        };
+
+        this.canvas.addEventListener('mousemove', e => moveHandler(e.clientY));
+        this.canvas.addEventListener('touchmove', e => {
+            e.preventDefault(); // 防止iPad滚动
+            moveHandler(e.touches[0].clientY);
+        }, {passive: false});
     }
 
-    // 映射极坐标到形变坐标
     morphPoint(r, thetaDeg, t, dist, rRef) {
         const rad = thetaDeg * Math.PI / 180;
         const radMid = this.centerTheta * Math.PI / 180;
@@ -100,32 +135,22 @@ class PlasmidPanel {
         };
     }
 
-    // 绘制形变色块（核心：闭合路径消除间隙）
     drawMorphedLayer(r1, r2, theta1, theta2, color, t, dist, rRef) {
         this.ctx.beginPath();
-        this.ctx.fillStyle = color;
-        this.ctx.lineJoin = 'round'; // 圆润衔接
-
-        const steps = 60; // 增加步长提高圆滑度
+        const steps = 40;
         const stepSize = (theta2 - theta1) / steps;
-        
-        // 外沿
         for (let i = 0; i <= steps; i++) {
             let p = this.morphPoint(r2, theta1 + i * stepSize, t, dist, rRef);
-            if (i === 0) this.ctx.moveTo(this.CX + p.x * this.SCALE, this.CY - p.y * this.SCALE);
-            else this.ctx.lineTo(this.CX + p.x * this.SCALE, this.CY - p.y * this.SCALE);
+            let px = this.CX + p.x * this.SCALE, py = this.CY - p.y * this.SCALE;
+            if (i === 0) this.ctx.moveTo(px, py); else this.ctx.lineTo(px, py);
         }
-        // 内沿
         for (let i = steps; i >= 0; i--) {
             let p = this.morphPoint(r1, theta1 + i * stepSize, t, dist, rRef);
             this.ctx.lineTo(this.CX + p.x * this.SCALE, this.CY - p.y * this.SCALE);
         }
         this.ctx.closePath();
+        this.ctx.fillStyle = color;
         this.ctx.fill();
-        // 描边以彻底掩盖微小缝隙
-        this.ctx.strokeStyle = color;
-        this.ctx.lineWidth = 0.5;
-        this.ctx.stroke();
     }
 
     drawMorphedText(text, radius, edgeAngle, alignDir, anchor, t, dist, rRef) {
@@ -136,7 +161,7 @@ class PlasmidPanel {
         let startTh = anchor === "start" ? edgeAngle + offset*alignDir : edgeAngle - (n-1)*this.degPerToken*alignDir - offset*alignDir;
 
         this.ctx.fillStyle = "#000";
-        this.ctx.font = "bold 14px 'Segoe UI', Arial";
+        this.ctx.font = "bold 16px 'Segoe UI', Arial";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
@@ -154,57 +179,11 @@ class PlasmidPanel {
         }
     }
 
-    setSequences(fT, fB, vLT, vLB, vRT, vRB) {
-        this.fragTop = fT; this.fragBot = fB;
-        this.vecLTop = vLT; this.vecLBot = vLB;
-        this.vecRTop = vRT; this.vecRBot = vRB;
-        this.paint();
-    }
-
-    setStaticState(mode, progress) {
-        this.mode = mode; this.progress = progress; this.isSelfLigating = false;
-        this.paint();
-    }
-
-    startRotationAnimation(onComplete) {
-        if (this.isRotating || this.isSelfLigating) return;
-        this.isRotating = true;
-        let start = performance.now();
-        const animate = (time) => {
-            let p = (time - start) / 600.0;
-            if (p >= 1.0) {
-                this.isRotating = false; this.rotationAngle = 0;
-                let nT = getTokens(this.fragBot).reverse().join('');
-                let nB = getTokens(this.fragTop).reverse().join('');
-                this.fragTop = nT; this.fragBot = nB;
-                if(onComplete) onComplete(nT, nB);
-                this.paint();
-            } else {
-                this.rotationAngle = p * 180; this.paint();
-                requestAnimationFrame(animate);
-            }
-        };
-        requestAnimationFrame(animate);
-    }
-
-    startSelfLigationAnimation() {
-        this.isSelfLigating = true;
-        this.selfLigationProgress = 0;
-        let start = performance.now();
-        const animate = (time) => {
-            let p = (time - start) / 800.0;
-            if (p >= 1.0) { this.selfLigationProgress = 1.0; this.paint(); }
-            else { this.selfLigationProgress = p; this.paint(); requestAnimationFrame(animate); }
-        };
-        requestAnimationFrame(animate);
-    }
-
     paint() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = "#fafafa";
+        this.ctx.fillStyle = "#fafafa"; 
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        let rOutE = 1.0, w = 0.16, rMid = rOutE - w;
+        let rOutE = 1.0, w = 0.15, rMid = rOutE - w;
         let rOutT = rOutE - w/2, rInT = rMid - w/2;
 
         let spanOuter = getTokens(this.fragTop).length * this.degPerToken;
@@ -215,15 +194,15 @@ class PlasmidPanel {
 
         let pSmooth = this.progress * this.progress * (3 - 2 * this.progress);
         let tMorph = this.mode === "extract" ? pSmooth : 1.0 - pSmooth;
-        let dist = this.mode === "extract" ? this.extractDistance * pSmooth : this.insertDistance * (1.0 - pSmooth);
+        let currentDist = this.mode === "extract" ? this.extractDistance * pSmooth : this.insertDistance * (1.0 - pSmooth);
 
         let vL = cLOut, vR_text = cROut;
+        
         if (this.isSelfLigating) {
             vL = cLOut - (spanOuter / 2.0) * this.selfLigationProgress;
             vR_text = cROut + (spanOuter / 2.0) * this.selfLigationProgress;
         }
 
-        // 1. 载体主体（闭环或开环）
         let vR = 360 + vR_text; 
         this.drawMorphedLayer(rMid, rOutE, vL, vR, this.vectorColor, 0, 0, rMid);
         this.drawMorphedLayer(rMid-w, rMid, vL - lOff, vR - rOff, this.vectorColor, 0, 0, rMid);
@@ -233,10 +212,10 @@ class PlasmidPanel {
         this.drawMorphedText(this.vecRTop, rOutT, vR_text, -1, "start", 0, 0, rMid);
         this.drawMorphedText(this.vecRBot, rInT, vR_text - rOff, -1, "start", 0, 0, rMid);
 
-        // 2. 目标片段
         if (getTokens(this.fragTop).length > 0) {
             this.ctx.save();
-            let fCenter = this.morphPoint(rMid - w/2, this.centerTheta, tMorph, dist, rMid);
+            let fCenter = this.morphPoint(rMid - w/2, this.centerTheta, tMorph, currentDist, rMid);
+            
             if (this.rotationAngle !== 0) {
                 this.ctx.translate(this.CX + fCenter.x * this.SCALE, this.CY - fCenter.y * this.SCALE);
                 this.ctx.rotate(this.rotationAngle * Math.PI / 180);
@@ -245,18 +224,19 @@ class PlasmidPanel {
 
             if (this.isSelfLigating) {
                 let rSmall = 45;
-                let cx = this.CX + fCenter.x * this.SCALE, cy = this.CY - fCenter.y * this.SCALE;
+                let cx = this.CX + fCenter.x * this.SCALE;
+                let cy = this.CY - fCenter.y * this.SCALE;
                 this.ctx.beginPath();
                 this.ctx.strokeStyle = this.fragmentColor;
                 this.ctx.lineWidth = 36;
-                let angle = 360 * this.selfLigationProgress;
-                this.ctx.arc(cx, cy, rSmall, (-90 - angle/2)*Math.PI/180, (-90 + angle/2)*Math.PI/180);
+                let currentAngle = 360 * this.selfLigationProgress;
+                this.ctx.arc(cx, cy, rSmall, (-90 - currentAngle/2)*Math.PI/180, (-90 + currentAngle/2)*Math.PI/180);
                 this.ctx.stroke();
             } else {
-                this.drawMorphedLayer(rMid, rOutE, cROut, cLOut, this.fragmentColor, tMorph, dist, rMid);
-                this.drawMorphedLayer(rMid-w, rMid, cROut - rOff, cLOut - lOff, this.fragmentColor, tMorph, dist, rMid);
-                this.drawMorphedText(this.fragTop, rOutT, cLOut, -1, "start", tMorph, dist, rMid);
-                this.drawMorphedText(this.fragBot, rInT, cLOut - lOff, -1, "start", tMorph, dist, rMid);
+                this.drawMorphedLayer(rMid, rOutE, cROut, cLOut, this.fragmentColor, tMorph, currentDist, rMid);
+                this.drawMorphedLayer(rMid-w, rMid, cROut - rOff, cLOut - lOff, this.fragmentColor, tMorph, currentDist, rMid);
+                this.drawMorphedText(this.fragTop, rOutT, cLOut, -1, "start", tMorph, currentDist, rMid);
+                this.drawMorphedText(this.fragBot, rInT, cLOut - lOff, -1, "start", tMorph, currentDist, rMid);
             }
             this.ctx.restore();
         }
@@ -264,16 +244,30 @@ class PlasmidPanel {
 }
 
 // ==========================================
-// 3. CircularGeneSelector (步骤1)
+// 类：圆环切割选取器 (步骤1)
 // ==========================================
 class CircularGeneSelector {
     constructor(canvasId, topSeq, botSeq) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.sequences = [topSeq, botSeq];
-        this.starts = [-1, -1]; this.ends = [-1, -1];
-        this.degPerUnit = 5.2; this.rOut = 180; this.rIn = 140;
-        this.canvas.addEventListener('mousedown', e => this.handleInteraction(e));
+        this.starts = [-1, -1];
+        this.ends = [-1, -1];
+        
+        // 【修改点】字体变大、序列变长（加入了-），调整单位弧度
+        this.degPerUnit = 9.0; 
+        // 【修改点】让 rOut (170) 和 rIn (130) 两条轨道间距等于 lineWidth (40)，彻底消除空隙
+        this.rOut = 170; this.rIn = 130; 
+        
+        const interactionEvent = e => {
+            e.preventDefault();
+            const rect = this.canvas.getBoundingClientRect();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            this.handleInteraction(clientX - rect.left, clientY - rect.top);
+        };
+        this.canvas.addEventListener('mousedown', interactionEvent);
+        this.canvas.addEventListener('touchstart', interactionEvent, {passive: false});
     }
 
     reset() { this.starts = [-1, -1]; this.ends = [-1, -1]; this.paint(); }
@@ -283,29 +277,37 @@ class CircularGeneSelector {
     getRowParts(row) {
         if (this.starts[row] === -1) return null;
         let s = this.sequences[row];
-        let mid = (this.ends[row] === -1) ? "" : s.substring(this.starts[row], this.ends[row]);
-        return [s.substring(0, this.starts[row]), mid, s.substring(this.ends[row] === -1 ? this.starts[row] : this.ends[row])];
+        if (this.ends[row] === -1) return [s.substring(0, this.starts[row]), "", s.substring(this.starts[row])];
+        return [s.substring(0, this.starts[row]), s.substring(this.starts[row], this.ends[row]), s.substring(this.ends[row])];
     }
 
-    handleInteraction(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        let dx = (e.clientX - rect.left) - this.canvas.width/2;
-        let dy = this.canvas.height/2 - (e.clientY - rect.top);
+    handleInteraction(x, y) {
+        let dx = x - this.canvas.width/2;
+        let dy = this.canvas.height/2 - y;
         let dist = Math.sqrt(dx*dx + dy*dy);
-        let row = (dist >= this.rOut-20 && dist <= this.rOut+20) ? 0 : (dist >= this.rIn-20 && dist <= this.rIn+20 ? 1 : -1);
+
+        let row = -1;
+        // 【修改点】扩展热区半径匹配 lineWidth (正负20px)
+        if (dist >= this.rOut-20 && dist <= this.rOut+20) row = 0;
+        else if (dist >= this.rIn-20 && dist <= this.rIn+20) row = 1;
 
         if (row !== -1) {
             let angleDeg = Math.atan2(dx, dy) * 180 / Math.PI;
             if (angleDeg < 0) angleDeg += 360;
-            let offset = (this.sequences[row].length * this.degPerUnit) / 2.0;
-            let idx = Math.round((angleDeg + offset) % 360 / this.degPerUnit);
+            let n = this.sequences[row].length;
+            let offset = (n * this.degPerUnit) / 2.0;
+            let rel = angleDeg + offset;
+            if (rel >= 360) rel -= 360;
             
-            if (idx >= 0 && idx <= this.sequences[row].length) {
+            let idx = Math.round(rel / this.degPerUnit);
+            if (idx >= 0 && idx <= n) {
                 if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) {
                     this.starts[row] = idx; this.ends[row] = -1;
                 } else {
                     this.ends[row] = idx;
-                    if (this.starts[row] > this.ends[row]) [this.starts[row], this.ends[row]] = [this.ends[row], this.starts[row]];
+                    if (this.starts[row] > this.ends[row]) {
+                        [this.starts[row], this.ends[row]] = [this.ends[row], this.starts[row]];
+                    }
                 }
                 this.paint();
             }
@@ -316,12 +318,14 @@ class CircularGeneSelector {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         let cx = this.canvas.width/2, cy = this.canvas.height/2;
 
+        // 【修改点】线宽等于内外圆间距 (170 - 130 = 40)
+        this.ctx.lineWidth = 40;
         this.ctx.strokeStyle = "rgba(168, 230, 207, 0.4)";
-        this.ctx.lineWidth = 35;
         this.ctx.beginPath(); this.ctx.arc(cx, cy, this.rOut, 0, Math.PI*2); this.ctx.stroke();
         this.ctx.beginPath(); this.ctx.arc(cx, cy, this.rIn, 0, Math.PI*2); this.ctx.stroke();
 
-        this.ctx.font = "bold 14px Arial";
+        // 【修改点】增大字号至 24px
+        this.ctx.font = "bold 24px Arial";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
@@ -343,11 +347,12 @@ class CircularGeneSelector {
                 this.ctx.restore();
 
                 if (i === this.starts[row] || i === this.ends[row]) {
-                    this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 3;
-                    let lRad = ((i * this.degPerUnit) - offset - 90) * Math.PI / 180;
+                    let lineRad = ((i * this.degPerUnit) - offset - 90) * Math.PI / 180;
+                    this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4;
                     this.ctx.beginPath();
-                    this.ctx.moveTo(cx + (r-18)*Math.cos(lRad), cy + (r-18)*Math.sin(lRad));
-                    this.ctx.lineTo(cx + (r+18)*Math.cos(lRad), cy + (r+18)*Math.sin(lRad));
+                    // 【修改点】切割红线跨度覆盖整个轨道宽度 (r-20 到 r+20)
+                    this.ctx.moveTo(cx + (r-20)*Math.cos(lineRad), cy + (r-20)*Math.sin(lineRad));
+                    this.ctx.lineTo(cx + (r+20)*Math.cos(lineRad), cy + (r+20)*Math.sin(lineRad));
                     this.ctx.stroke();
                 }
             }
@@ -356,16 +361,28 @@ class CircularGeneSelector {
 }
 
 // ==========================================
-// 4. GeneSegmentSelector (步骤2)
+// 类：线性片段选取器 (步骤2)
 // ==========================================
 class GeneSegmentSelector {
     constructor(canvasId, topSeq, botSeq) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
         this.sequences = [topSeq, botSeq];
-        this.starts = [-1, -1]; this.ends = [-1, -1];
-        this.unit = 32; this.startX = 50; this.cy = 250;
-        this.canvas.addEventListener('mousedown', e => this.handleInteraction(e));
+        this.starts = [-1, -1];
+        this.ends = [-1, -1];
+        
+        // 【修改点】因为包含了 -，长度加倍，单位距离缩减以适应屏幕
+        this.unit = 18; this.startX = 40; this.cy = 250; 
+        
+        const interactionEvent = e => {
+            e.preventDefault();
+            const rect = this.canvas.getBoundingClientRect();
+            let clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            let clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            this.handleInteraction(clientX - rect.left, clientY - rect.top);
+        };
+        this.canvas.addEventListener('mousedown', interactionEvent);
+        this.canvas.addEventListener('touchstart', interactionEvent, {passive: false});
     }
 
     reset() { this.starts = [-1, -1]; this.ends = [-1, -1]; this.paint(); }
@@ -378,14 +395,16 @@ class GeneSegmentSelector {
         return [s.substring(0, this.starts[row]), s.substring(this.starts[row], this.ends[row]), s.substring(this.ends[row])];
     }
 
-    handleInteraction(e) {
-        const rect = this.canvas.getBoundingClientRect();
-        let x = e.clientX - rect.left, y = e.clientY - rect.top;
-        let row = (y >= this.cy - 60 && y <= this.cy - 10) ? 0 : (y >= this.cy + 10 && y <= this.cy + 60 ? 1 : -1);
+    handleInteraction(x, y) {
+        let row = -1;
+        // 【修改点】扩大热区并完美无缝连接（cy为分界线，上下各50px跨度）
+        if (y >= this.cy - 50 && y < this.cy) row = 0;
+        else if (y >= this.cy && y <= this.cy + 50) row = 1;
 
         if (row !== -1) {
-            let idx = Math.round((x - this.startX) / this.unit);
-            if (idx >= 0 && idx <= this.sequences[row].length) {
+            let idx = Math.round((x - this.startX + this.unit/2) / this.unit);
+            let n = this.sequences[row].length;
+            if (idx >= 0 && idx <= n) {
                 if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) {
                     this.starts[row] = idx; this.ends[row] = -1;
                 } else {
@@ -399,24 +418,27 @@ class GeneSegmentSelector {
 
     paint() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.font = "bold 16px Arial";
+        // 【修改点】大字号适配 iPad
+        this.ctx.font = "bold 24px Arial";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
         for (let row = 0; row < 2; row++) {
             let seq = this.sequences[row];
-            let yPos = row === 0 ? this.cy - 35 : this.cy + 35;
-            this.ctx.fillStyle = "rgba(168, 230, 207, 0.6)";
-            this.ctx.fillRect(this.startX - 16, yPos - 25, seq.length * this.unit, 50);
+            // 【修改点】控制矩形Y轴贴近，使两块蓝色背景严格在 this.cy 处无缝对接
+            let yPos = row === 0 ? this.cy - 25 : this.cy + 25;
+            
+            this.ctx.fillStyle = "rgba(168, 230, 207, 0.5)";
+            this.ctx.fillRect(this.startX - this.unit/2, yPos - 25, seq.length * this.unit, 50);
 
             for (let i = 0; i < seq.length; i++) {
                 let x = this.startX + i * this.unit;
-                let isSel = this.ends[row] !== -1 && (i >= this.starts[row] && i < this.ends[row]);
-                this.ctx.fillStyle = isSel ? "red" : "black";
+                let isSelected = this.ends[row] !== -1 && (i >= this.starts[row] && i < this.ends[row]);
+                this.ctx.fillStyle = isSelected ? "red" : "black";
                 this.ctx.fillText(seq[i], x, yPos);
 
                 if (i === this.starts[row] || i === this.ends[row]) {
-                    this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 3;
+                    this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4;
                     this.ctx.beginPath(); 
                     this.ctx.moveTo(x - this.unit/2, yPos - 25); 
                     this.ctx.lineTo(x - this.unit/2, yPos + 25); 
@@ -428,14 +450,17 @@ class GeneSegmentSelector {
 }
 
 // ==========================================
-// 5. MainApp 控制逻辑
+// 控制器：MainApp 协调全局
 // ==========================================
 class MainApp {
     constructor() {
-        this.INITIAL_SEQ_TOP = "ATGCGTAATAGC"; 
-        this.INITIAL_SEQ_BOT = "TACGCATTATCG";
-        this.LINEAR_GENE_TOP = "GGATCCAAGCTT"; 
-        this.LINEAR_GENE_BOT = "CCTAGGTTCGAA";
+        // 【修改点】在初始数据中显式插入 "-" 作为间隔符
+        // 配合 getTokens 和 cleanSeq 逻辑，这种写法不仅在左侧切割面板具有良好的文字间隔
+        // 在传入 3D 形变渲染时依然会100%完美映射。
+        this.INITIAL_SEQ_TOP = "A-T-G-C-G-T-A-A-T-A-G-C"; 
+        this.INITIAL_SEQ_BOT = "T-A-C-G-C-A-T-T-A-T-C-G";
+        this.LINEAR_GENE_TOP = "G-G-A-T-C-C-A-A-G-C-T-T"; 
+        this.LINEAR_GENE_BOT = "C-C-T-A-G-G-T-T-C-G-A-A";
 
         this.plasmidPanel = new PlasmidPanel('previewCanvas');
         this.circSelector = new CircularGeneSelector('circularCanvas', this.INITIAL_SEQ_TOP, this.INITIAL_SEQ_BOT);
@@ -447,40 +472,45 @@ class MainApp {
     }
 
     bindEvents() {
-        document.getElementById('btn-reset').onclick = () => this.resetState();
-        document.getElementById('btn-rotate').onclick = () => {
-            if ((this.plasmidPanel.mode === "extract" && this.plasmidPanel.progress < 0.8) || 
-                (this.plasmidPanel.mode === "insert" && this.plasmidPanel.progress > 0.2)) {
+        document.getElementById('btn-reset').addEventListener('click', () => this.resetState());
+        document.getElementById('btn-rotate').addEventListener('click', () => {
+            let p = this.plasmidPanel.progress, m = this.plasmidPanel.mode;
+            if ((m === "extract" && p < 0.8) || (m === "insert" && p > 0.2)) {
                 alert("⚠️ 请将片段完全拉拽到屏幕上方位置才能旋转！"); return;
             }
             this.plasmidPanel.startRotationAnimation((nT, nB) => {
                 this.plasmidPanel.fragTop = nT; this.plasmidPanel.fragBot = nB;
             });
-        };
-        document.getElementById('btn-ligate').onclick = () => this.executeLigation();
-        document.getElementById('btn-cut').onclick = () => this.executeCut();
+        });
+
+        document.getElementById('btn-ligate').addEventListener('click', () => this.executeLigation());
+        document.getElementById('btn-cut').addEventListener('click', () => this.executeCut());
     }
 
     resetState() {
         this.appStep = 1;
         this.circSelector.reset(); this.circSelector.show();
         this.linSelector.hide();
-        let mid = Math.floor(this.INITIAL_SEQ_TOP.length / 2);
-        let vLT = this.INITIAL_SEQ_TOP.substring(0, mid), vRT = this.INITIAL_SEQ_TOP.substring(mid);
-        let vLB = this.INITIAL_SEQ_BOT.substring(0, mid), vRB = this.INITIAL_SEQ_BOT.substring(mid);
 
-        this.plasmidPanel.setSequences("", "", 
-            `5'-${formatSeq(vLT)}-`, `3'-${formatSeq(vLB)}-`, 
-            `-${formatSeq(vRT)}-3'`, `-${formatSeq(vRB)}-5'`);
+        let mid = Math.floor(this.INITIAL_SEQ_TOP.length / 2);
+        let vLT = this.INITIAL_SEQ_TOP.substring(0, mid), vLB = this.INITIAL_SEQ_BOT.substring(0, mid);
+        let vRT = this.INITIAL_SEQ_TOP.substring(mid), vRB = this.INITIAL_SEQ_BOT.substring(mid);
+
+        this.plasmidPanel.setSequences("", "", `5'-${formatSeq(vLT)}-`, `3'-${formatSeq(vLB)}-`, `-${formatSeq(vRT)}-3'`, `-${formatSeq(vRB)}-5'`);
         this.plasmidPanel.setStaticState("extract", 0.0);
+
         document.getElementById('step-title').innerText = "交互操作区 - 步骤 1：圆环切割";
+        document.getElementById('status-text').innerText = "请在上方圆环上点击选择切割边界（红线）。";
         document.getElementById('btn-cut').innerText = "✂️ 执行切割";
     }
 
     executeCut() {
         let activeSel = this.appStep === 1 ? this.circSelector : this.linSelector;
         let tParts = activeSel.getRowParts(0), bParts = activeSel.getRowParts(1);
-        if (!tParts || !bParts) { alert("⚠️ 请在上下链各选择切割区域！"); return; }
+
+        if (!tParts || !bParts) {
+            alert("⚠️ 请在上下链各选择切割位点！(需要用红线圈出片段范围)"); return;
+        }
 
         if (this.appStep === 1) {
             this.plasmidPanel.setSequences(
@@ -489,13 +519,17 @@ class MainApp {
                 `-${formatSeq(tParts[2])}-3'`, `-${formatSeq(bParts[2])}-5'`
             );
             this.appStep = 2;
-            this.circSelector.hide(); this.linSelector.reset(); this.linSelector.show();
+            this.circSelector.hide();
+            this.linSelector.reset(); this.linSelector.show();
+
             document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：片段提取";
+            document.getElementById('status-text').innerText = "载体已切开！请在右侧按住鼠标【向上拖拽】拔出片段。";
             document.getElementById('btn-cut').innerText = "🧬 提取新基因";
         } else {
             this.plasmidPanel.fragTop = formatSeq(tParts[1]);
             this.plasmidPanel.fragBot = formatSeq(bParts[1]);
             this.plasmidPanel.setStaticState("insert", 0.0);
+            document.getElementById('status-text').innerText = "新基因已就绪！请在右侧按住鼠标【向下拖拽】嵌入缺口。";
         }
     }
 
@@ -506,14 +540,17 @@ class MainApp {
         let isInserted = (p.mode === "extract" && p.progress < 0.2) || (p.mode === "insert" && p.progress > 0.8);
 
         if (isDetached) {
-            if (isComplementary(p.vecLTop+p.vecRTop, p.vecLBot+p.vecRBot)) p.startSelfLigationAnimation();
-            else alert("❌ 自连失败：末端碱基不匹配！");
+            if (isComplementary(cleanSeq(p.vecLTop)+cleanSeq(p.vecRTop), cleanSeq(p.vecLBot)+cleanSeq(p.vecRBot))) {
+                p.startSelfLigationAnimation();
+            } else alert("❌ 自连失败：末端碱基不匹配！");
         } else if (isInserted) {
-            if (isComplementary(p.vecLTop+p.fragTop+p.vecRTop, p.vecLBot+p.fragBot+p.vecRBot)) {
+            if (isComplementary(cleanSeq(p.vecLTop)+cleanSeq(p.fragTop)+cleanSeq(p.vecRTop), cleanSeq(p.vecLBot)+cleanSeq(p.fragBot)+cleanSeq(p.vecRBot))) {
                 p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
-                alert("🎉 重组成功！片段已插入。");
-            } else alert("❌ 嵌入失败：碱基不配对！建议翻转片段。");
-        } else alert("⚠️ 请拖动到缺口或顶端再拼合！");
+                alert("🎉 重组成功！片段已完美插入载体。");
+            } else alert("❌ 嵌入失败：碱基不配对！建议翻转片段再试。");
+        } else {
+            alert("⚠️ 请将片段拖拽到最上方或缺口内部再执行拼合！");
+        }
     }
 }
 
