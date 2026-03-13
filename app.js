@@ -1,20 +1,40 @@
 // ==========================================
-// 辅助工具函数
+// 辅助工具函数 (智能排版与解析引擎)
 // ==========================================
-function formatSeq(seq) { return seq ? seq.replace(/-/g, "").split("").join("-") : ""; }
-function cleanSeq(seq) { return seq ? seq.replace(/-/g, "").replace(/5'/g, "").replace(/3'/g, "").trim() : ""; }
-function getTokens(text) { return (text || "").match(/5'|3'|\.{2,}|./g) || []; }
+
+// 【核心新增】智能排版：仅在相邻的大写 A, T, C, G 之间自动插入连字符。单词(如 Gene)保持完整。
+function autoFormatATCG(seq) {
+    if (!seq) return "";
+    // 自动寻找连续的 ATCG 并在中间插入 '-'
+    return seq.replace(/([ATCG])(?=[ATCG])/g, '$1-');
+}
+
+function cleanSeq(seq) { 
+    return seq ? seq.replace(/-/g, "").replace(/5'/g, "").replace(/3'/g, "").trim() : ""; 
+}
+
+function getTokens(text) { 
+    // 将序列拆分为独立渲染单元，单词将被拆为单个字母跟随圆环曲率渲染
+    return (text || "").match(/5'|3'|\.{2,}|./g) || []; 
+}
+
+// 【优化匹配逻辑】放宽限制，使得自定义单词(如 Gene 与 Gene)也能直接判定为配对成功
 function isComplementary(top, bot) {
     if (top.length !== bot.length || top.length === 0) return false;
     for (let i = 0; i < top.length; i++) {
         let t = top[i], b = bot[i];
-        if (!((t==='A'&&b==='T')||(t==='T'&&b==='A')||(t==='C'&&b==='G')||(t==='G'&&b==='C'))) return false;
+        let pair = t.toUpperCase() + b.toUpperCase();
+        // 1. 标准生物学配对
+        if (['AT','TA','CG','GC'].includes(pair)) continue;
+        // 2. 自定义单词同字母容错配对 (如 Gene 对应 Gene)
+        if (t.toLowerCase() === b.toLowerCase()) continue; 
+        return false;
     }
     return true;
 }
 
 // ==========================================
-// 类：3D 形变渲染区 (完美碰撞检测 + 绝对中心锚定)
+// 类：3D 形变渲染区
 // ==========================================
 class PlasmidPanel {
     constructor(canvasId) {
@@ -31,7 +51,6 @@ class PlasmidPanel {
         this.extractDistance = 1.0; 
         this.insertDistance = 1.0;
         
-        // 旋转参数
         this.rotationAngleZ = 0.0; 
         this.rotationAngleY = 0.0; 
         this.isRotating = false;
@@ -39,7 +58,6 @@ class PlasmidPanel {
         this.selfLigationProgress = 0.0;
         
         this.isClosedCircle = true; 
-        
         this.fragTop = ""; this.fragBot = "";
         this.vecLTop = ""; this.vecLBot = "";
         this.vecRTop = ""; this.vecRBot = "";
@@ -59,7 +77,6 @@ class PlasmidPanel {
         this.mode = mode; this.progress = progress; this.isSelfLigating = false; this.paint();
     }
 
-    // 动画引擎：平面旋转 (绕Z轴)
     startZRotationAnimation() {
         if (this.isRotating || this.isSelfLigating) return;
         this.isRotating = true;
@@ -69,16 +86,15 @@ class PlasmidPanel {
             if (p >= 1.0) {
                 this.isRotating = false;
                 this.rotationAngleZ = 0;
-                
                 let oldFTLen = getTokens(this.fragTop).length;
                 let oldFBLen = getTokens(this.fragBot).length;
-                // Z轴旋转的拓扑偏移推算公式
                 this.fragOffset = this.fragOffset + oldFBLen - oldFTLen;
 
                 let nT = cleanSeq(this.fragBot).split('').reverse().join('');
                 let nB = cleanSeq(this.fragTop).split('').reverse().join('');
-                this.fragTop = formatSeq(nT) + (nT ? "-" : ""); 
-                this.fragBot = formatSeq(nB) + (nB ? "-" : "");
+                // 翻转后重新应用智能排版
+                this.fragTop = autoFormatATCG(nT) + (nT ? "-" : ""); 
+                this.fragBot = autoFormatATCG(nB) + (nB ? "-" : "");
                 this.paint();
             } else {
                 this.rotationAngleZ = p * 180;
@@ -89,7 +105,6 @@ class PlasmidPanel {
         requestAnimationFrame(animate);
     }
 
-    // 动画引擎：水平翻转 (绕Y轴)
     startYRotationAnimation() {
         if (this.isRotating || this.isSelfLigating) return;
         this.isRotating = true;
@@ -99,16 +114,14 @@ class PlasmidPanel {
             if (p >= 1.0) {
                 this.isRotating = false;
                 this.rotationAngleY = 0;
-                
                 let oldFTLen = getTokens(this.fragTop).length;
                 let oldFBLen = getTokens(this.fragBot).length;
-                // Y轴翻转的拓扑偏移推算公式
                 this.fragOffset = oldFTLen - oldFBLen - this.fragOffset;
 
                 let nT = cleanSeq(this.fragTop).split('').reverse().join('');
                 let nB = cleanSeq(this.fragBot).split('').reverse().join('');
-                this.fragTop = formatSeq(nT) + (nT ? "-" : ""); 
-                this.fragBot = formatSeq(nB) + (nB ? "-" : "");
+                this.fragTop = autoFormatATCG(nT) + (nT ? "-" : ""); 
+                this.fragBot = autoFormatATCG(nB) + (nB ? "-" : "");
                 this.paint();
             } else {
                 this.rotationAngleY = p * 180;
@@ -188,8 +201,6 @@ class PlasmidPanel {
         for (let i = 0; i < n; i++) {
             let th = startTh + i * this.degPerToken * alignDir, p = this.morphPoint(radius, th, t, dist, rRef);
             let rot = (1 - t) * (th - 90) + t * (this.centerTheta - 90); 
-            // 【修复点】：彻底移除了 if (rot < -90 || rot > 90) rot += 180;
-            // 使所有字体严格自然贴合圆环排列，不再强制翻转！
             this.ctx.save(); 
             this.ctx.translate(this.CX + p.x * this.SCALE, this.CY - p.y * this.SCALE); 
             this.ctx.rotate((-rot) * Math.PI / 180); 
@@ -209,7 +220,6 @@ class PlasmidPanel {
         let rOffTokens = getTokens(this.vecRTop).length - getTokens(this.vecRBot).length;
         let fragOffset = this.fragOffset || 0;
 
-        // 1. 在本地坐标系中建立片段几何
         let L_bound = Math.min(0, fragOffset);
         let R_bound = Math.max(lenFT, fragOffset + lenFB);
         let C = (L_bound + R_bound) / 2.0;
@@ -219,20 +229,16 @@ class PlasmidPanel {
         let fBL = 90 + (C - fragOffset) * deg;     
         let fBR = fBL - lenFB * deg;               
 
-        // 2. 防干涉碰撞检测（智能适应间距）
         let vTL, vTR;
         if (lenFT === 0 && lenFB === 0) {
             let minGap = this.isClosedCircle ? 0 : 1.0; 
             vTL = 90 + minGap * deg;
             vTR = 90 - minGap * deg;
         } else {
-            // 当片段存在时，强制载体完美紧贴边界，不留额外空隙
             vTL = Math.max(fTL, fBL + lOffTokens * deg);
             vTR = Math.min(fTR, fBR + rOffTokens * deg);
         }
 
-        // 3. 【核心修复】：整体锚定平移，锁死旋转中心
-        // 算出载体间隙的中心，然后将所有元素反向移动，确保视觉中心永远定在 90 度
         let vCenter = (vTL + vTR) / 2.0;
         let shift = 90 - vCenter;
         
@@ -266,7 +272,6 @@ class PlasmidPanel {
             this.ctx.save();
             let fCenter = this.morphPoint(rMid - w/2, 90, tMorph, currentDist, rMid);
             
-            // 执行真实的中心锚定翻转动画
             this.ctx.translate(this.CX + fCenter.x * this.SCALE, this.CY - fCenter.y * this.SCALE);
             if (this.rotationAngleZ !== 0) this.ctx.rotate(this.rotationAngleZ * Math.PI / 180);
             if (this.rotationAngleY !== 0) this.ctx.scale(Math.cos(this.rotationAngleY * Math.PI / 180), 1);
@@ -306,12 +311,12 @@ class PlasmidPanel {
 }
 
 // ==========================================
-// 类：圆环选取器
+// 类：圆环选取器 (步骤 1)
 // ==========================================
 class CircularGeneSelector {
-    constructor(canvasId, topSeq, botSeq) {
+    constructor(canvasId) {
         this.canvas = document.getElementById(canvasId); this.ctx = this.canvas.getContext('2d');
-        this.sequences = [topSeq, botSeq]; this.starts = [-1, -1]; this.ends = [-1, -1];
+        this.sequences = ["", ""]; this.starts = [-1, -1]; this.ends = [-1, -1];
         this.degPerUnit = 8.5; this.rOut = 190; this.rIn = 150; 
         const interactionEvent = e => {
             e.preventDefault(); const rect = this.canvas.getBoundingClientRect();
@@ -334,11 +339,25 @@ class CircularGeneSelector {
         let row = -1; if (dist >= 170 && dist <= 210) row = 0; else if (dist >= 130 && dist < 170) row = 1;
         if (row !== -1) {
             let aD = Math.atan2(dx, dy) * 180 / Math.PI; if (aD < 0) aD += 360;
-            let n = this.sequences[row].length, off = (n * this.degPerUnit) / 2.0, rel = aD + off; if (rel >= 360) rel -= 360;
-            let idx = Math.round(rel / this.degPerUnit); if (idx % 2 === 0) idx += (rel/this.degPerUnit > idx) ? 1 : -1;
-            idx = Math.max(1, Math.min(n-2, idx));
-            if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) { this.starts[row] = idx; this.ends[row] = -1; } else { this.ends[row] = idx; }
-            this.paint();
+            let seq = this.sequences[row], n = seq.length, off = (n * this.degPerUnit) / 2.0, rel = aD + off; if (rel >= 360) rel -= 360;
+            let exactIdx = rel / this.degPerUnit;
+            
+            // 【核心规则1】：仅在距离足够近时，寻找且吸附到 '-' 字符
+            let closestDash = -1, minDist = 1.5; 
+            for(let i=0; i<n; i++) {
+                if(seq[i] === '-') {
+                    let d = Math.abs(exactIdx - i);
+                    let dW1 = Math.abs(exactIdx - (i + n));
+                    let dW2 = Math.abs((exactIdx + n) - i);
+                    d = Math.min(d, dW1, dW2);
+                    if(d < minDist) { minDist = d; closestDash = i; }
+                }
+            }
+            if (closestDash !== -1) {
+                let idx = closestDash;
+                if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) { this.starts[row] = idx; this.ends[row] = -1; } else { this.ends[row] = idx; }
+                this.paint();
+            }
         }
     }
     paint() {
@@ -351,7 +370,9 @@ class CircularGeneSelector {
             for (let i = 0; i < seq.length; i++) {
                 let deg = (i * this.degPerUnit) - off + (this.degPerUnit / 2.0), rad = (deg - 90) * Math.PI / 180, x = cx + r * Math.cos(rad), y = cy + r * Math.sin(rad);
                 let isD = (i === this.starts[row] || i === this.ends[row]), st = Math.min(this.starts[row], this.ends[row]), ed = Math.max(this.starts[row], this.ends[row]), isS = this.ends[row] !== -1 && (i > st && i < ed);
-                this.ctx.fillStyle = isS ? "red" : "black"; this.ctx.save(); this.ctx.translate(x, y); this.ctx.rotate(rad + Math.PI/2); if (!isD) this.ctx.fillText(seq[i], 0, 0); this.ctx.restore();
+                this.ctx.fillStyle = isS ? "red" : "black"; this.ctx.save(); this.ctx.translate(x, y); this.ctx.rotate(rad + Math.PI/2); 
+                if (!isD) this.ctx.fillText(seq[i], 0, 0); 
+                this.ctx.restore();
                 if (isD) {
                     let lR = ((i * this.degPerUnit) - off + (this.degPerUnit / 2.0) - 90) * Math.PI / 180;
                     this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4; this.ctx.beginPath(); this.ctx.moveTo(cx + (r-20)*Math.cos(lR), cy + (r-20)*Math.sin(lR)); this.ctx.lineTo(cx + (r+20)*Math.cos(lR), cy + (r+20)*Math.sin(lR)); this.ctx.stroke();
@@ -362,12 +383,12 @@ class CircularGeneSelector {
 }
 
 // ==========================================
-// 类：线性片段选取器
+// 类：线性片段选取器 (步骤 2)
 // ==========================================
 class GeneSegmentSelector {
-    constructor(canvasId, topSeq, botSeq) {
+    constructor(canvasId) {
         this.canvas = document.getElementById(canvasId); this.ctx = this.canvas.getContext('2d');
-        this.sequences = [topSeq, botSeq]; this.starts = [-1, -1]; this.ends = [-1, -1];
+        this.sequences = ["", ""]; this.starts = [-1, -1]; this.ends = [-1, -1];
         this.unit = 18; this.startX = 40; this.cy = 250; 
         const interactionEvent = e => {
             e.preventDefault(); const rect = this.canvas.getBoundingClientRect();
@@ -387,10 +408,21 @@ class GeneSegmentSelector {
     handleInteraction(x, y) {
         let row = -1; if (y >= this.cy - 40 && y < this.cy) row = 0; else if (y >= this.cy && y <= this.cy + 40) row = 1;
         if (row !== -1) {
-            let idx = Math.round((x - this.startX) / this.unit); if (idx % 2 === 0) idx += ((x - this.startX) / this.unit > idx) ? 1 : -1;
-            idx = Math.max(1, Math.min(this.sequences[row].length-2, idx));
-            if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) { this.starts[row] = idx; this.ends[row] = -1; } else { this.ends[row] = idx; }
-            this.paint();
+            let seq = this.sequences[row], n = seq.length, exactIdx = (x - this.startX) / this.unit;
+            
+            // 【核心规则2】：同圆环，限制提取边界必须锁定在 '-' 号上
+            let closestDash = -1, minDist = 1.5;
+            for(let i=0; i<n; i++) {
+                if(seq[i] === '-') {
+                    let d = Math.abs(exactIdx - i);
+                    if(d < minDist) { minDist = d; closestDash = i; }
+                }
+            }
+            if (closestDash !== -1) {
+                let idx = closestDash;
+                if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) { this.starts[row] = idx; this.ends[row] = -1; } else { this.ends[row] = idx; }
+                this.paint();
+            }
         }
     }
     paint() {
@@ -400,7 +432,8 @@ class GeneSegmentSelector {
             this.ctx.fillStyle = "rgba(168, 230, 207, 0.5)"; this.ctx.fillRect(this.startX - this.unit/2, yPos - 20, seq.length * this.unit, 40);
             for (let i = 0; i < seq.length; i++) {
                 let x = this.startX + i * this.unit, isD = (i === this.starts[row] || i === this.ends[row]), st = Math.min(this.starts[row], this.ends[row]), ed = Math.max(this.starts[row], this.ends[row]), isS = this.ends[row] !== -1 && (i > st && i < ed);
-                this.ctx.fillStyle = isS ? "red" : "black"; if (!isD) this.ctx.fillText(seq[i], x, yPos);
+                this.ctx.fillStyle = isS ? "red" : "black"; 
+                if (!isD) this.ctx.fillText(seq[i], x, yPos);
                 else { this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4; this.ctx.beginPath(); this.ctx.moveTo(x, yPos - 20); this.ctx.lineTo(x, yPos + 20); this.ctx.stroke(); }
             }
         }
@@ -412,12 +445,24 @@ class GeneSegmentSelector {
 // ==========================================
 class MainApp {
     constructor() {
-        this.INITIAL_SEQ_TOP = "A-T-G-C-G-T-A-A-T-A-G-C"; this.INITIAL_SEQ_BOT = "T-A-C-G-C-A-T-T-A-T-C-G";
-        this.LINEAR_GENE_TOP = "G-G-A-T-C-C-A-A-G-C-T-T"; this.LINEAR_GENE_BOT = "C-C-T-A-G-G-T-T-C-G-A-A";
+        this.DEFAULT_CIRC_TOP = "ATGCGTAATAGC"; 
+        this.DEFAULT_CIRC_BOT = "TACGCATTATCG";
+        this.DEFAULT_LIN_TOP = "GGATCCAAGCTT"; 
+        this.DEFAULT_LIN_BOT = "CCTAGGTTCGAA";
+
+        // 初次加载时自动进行 ATCG 格式排版
+        this.circTop = autoFormatATCG(this.DEFAULT_CIRC_TOP);
+        this.circBot = autoFormatATCG(this.DEFAULT_CIRC_BOT);
+        this.linTop = autoFormatATCG(this.DEFAULT_LIN_TOP);
+        this.linBot = autoFormatATCG(this.DEFAULT_LIN_BOT);
+
         this.plasmidPanel = new PlasmidPanel('previewCanvas');
-        this.circSelector = new CircularGeneSelector('circularCanvas', this.INITIAL_SEQ_TOP, this.INITIAL_SEQ_BOT);
-        this.linSelector = new GeneSegmentSelector('linearCanvas', this.LINEAR_GENE_TOP, this.LINEAR_GENE_BOT);
-        this.appStep = 1; this.bindEvents(); this.resetState();
+        this.circSelector = new CircularGeneSelector('circularCanvas');
+        this.linSelector = new GeneSegmentSelector('linearCanvas');
+        this.appStep = 1; 
+        
+        this.bindEvents(); 
+        this.resetState();
     }
 
     showModal(title, body, btnText = "我知道了") {
@@ -446,73 +491,134 @@ class MainApp {
             this.plasmidPanel.startYRotationAnimation();
         });
 
+        // 绑定：自定义序列操作面板 (重置)
+        document.getElementById('btn-reset-seq').addEventListener('click', () => {
+            if (this.appStep === 1) {
+                this.circTop = autoFormatATCG(this.DEFAULT_CIRC_TOP);
+                this.circBot = autoFormatATCG(this.DEFAULT_CIRC_BOT);
+                document.getElementById('input-top-seq').value = this.circTop;
+                document.getElementById('input-bot-seq').value = this.circBot;
+                this.resetState();
+            } else {
+                this.linTop = autoFormatATCG(this.DEFAULT_LIN_TOP);
+                this.linBot = autoFormatATCG(this.DEFAULT_LIN_BOT);
+                document.getElementById('input-top-seq').value = this.linTop;
+                document.getElementById('input-bot-seq').value = this.linBot;
+                this.updateLinearSelector();
+            }
+        });
+
+        // 绑定：自定义序列操作面板 (应用)
+        document.getElementById('btn-apply-seq').addEventListener('click', () => {
+            let tVal = document.getElementById('input-top-seq').value.trim();
+            let bVal = document.getElementById('input-bot-seq').value.trim();
+            if(!tVal || !bVal) return alert("⚠️ 序列不能为空！");
+            
+            // 应用智能格式化，保留手动输入的特殊词
+            tVal = autoFormatATCG(tVal);
+            bVal = autoFormatATCG(bVal);
+            document.getElementById('input-top-seq').value = tVal;
+            document.getElementById('input-bot-seq').value = bVal;
+
+            if (this.appStep === 1) {
+                this.circTop = tVal; this.circBot = bVal;
+                this.resetState();
+            } else {
+                this.linTop = tVal; this.linBot = bVal;
+                this.updateLinearSelector();
+            }
+        });
+
         document.getElementById('btn-ligate').addEventListener('click', () => this.executeLigation());
         document.getElementById('btn-cut').addEventListener('click', () => this.executeCut());
     }
 
+    updateLinearSelector() {
+        this.linSelector.sequences = [this.linTop, this.linBot];
+        this.linSelector.reset();
+    }
+
     resetState() {
-        this.appStep = 1; this.circSelector.reset(); this.circSelector.show(); this.linSelector.hide();
+        this.appStep = 1; 
         
-        let mid = Math.floor(this.INITIAL_SEQ_TOP.length / 2);
-        let vLT = this.INITIAL_SEQ_TOP.substring(0, mid), vLB = this.INITIAL_SEQ_BOT.substring(0, mid);
-        let vRT = this.INITIAL_SEQ_TOP.substring(mid), vRB = this.INITIAL_SEQ_BOT.substring(mid);
+        // 更新 UI 输入框内容
+        document.getElementById('input-step-label').innerText = "当前操作：载体序列";
+        document.getElementById('input-top-seq').value = this.circTop;
+        document.getElementById('input-bot-seq').value = this.circBot;
+
+        this.circSelector.sequences = [this.circTop, this.circBot];
+        this.circSelector.reset(); 
+        this.circSelector.show(); 
+        this.linSelector.hide();
+        
+        let mid = Math.floor(this.circTop.length / 2);
+        let vLT = this.circTop.substring(0, mid), vLB = this.circBot.substring(0, mid);
+        let vRT = this.circTop.substring(mid), vRB = this.circBot.substring(mid);
         
         this.plasmidPanel.fragOffset = 0;
         this.plasmidPanel.isClosedCircle = true; 
         
         this.plasmidPanel.setSequences(
             "", "", 
-            `${formatSeq(vLT)}-`, `${formatSeq(vLB)}-`, 
-            `${formatSeq(vRT)}`, `${formatSeq(vRB)}`
+            `${vLT}`, `${vLB}`, 
+            `${vRT}`, `${vRB}`
         );
         this.plasmidPanel.setStaticState("extract", 0.0);
         
         document.getElementById('step-title').innerText = "交互操作区 - 步骤 1：圆环切割";
-        document.getElementById('status-text').innerText = "请点击左侧圆环上的连字符 (-) 选择切割位点。";
-        this.showModal("欢迎来到基因克隆仿真实验", "<b>第一步：准备载体</b><br>我们需要切开质粒载体。请在左侧圆环的上下两条链上分别点击一个红色的切割位点（选择一个区域），然后点击“执行切割”。");
+        document.getElementById('status-text').innerText = "请在下方序列上点击（-）连字符位置选择切割位点。";
+        this.showModal("欢迎来到基因克隆仿真实验", "<b>第一步：准备载体</b><br>您可以在左侧面板自定义载体序列（输入 ATCG 等字母会自动插入排版连接符，而像 'Gene' 等单词会被视为整体保持完整，无法被切断）。<br><br>请在红线上点击选定一个将要被抛弃的区域，执行切割！");
     }
 
     executeCut() {
         let activeSel = (this.appStep === 1) ? this.circSelector : this.linSelector;
         let tParts = activeSel.getRowParts(0), bParts = activeSel.getRowParts(1);
-        if (!tParts || !bParts) return alert("⚠️ 请先在上下链各选择两个红色的切割标识点！");
+        
+        if (!tParts || !bParts) return alert("⚠️ 请先在上下链各选择两个红色的切割标识点！(注：单词内部无法切断)");
 
-        // 【修正1】：完全正确的粘性末端符号推算 (stB - stT)，修正错位！
         let getSt = (sel, row) => sel.ends[row] === -1 ? sel.starts[row] : Math.min(sel.starts[row], sel.ends[row]);
         let stT = getSt(activeSel, 0);
         let stB = getSt(activeSel, 1);
         let structuralOffset = stB - stT; 
 
         if (this.appStep === 1) {
-            let fT = formatSeq(tParts[1]); fT = fT ? fT + "-" : "";
-            let fB = formatSeq(bParts[1]); fB = fB ? fB + "-" : "";
+            let fT = tParts[1]; fT = fT ? fT + "-" : "";
+            let fB = bParts[1]; fB = fB ? fB + "-" : "";
             
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.isClosedCircle = false; 
             
             this.plasmidPanel.setSequences(
                 fT, fB, 
-                `5'-${formatSeq(tParts[0])}-`, `3'-${formatSeq(bParts[0])}-`, 
-                `${formatSeq(tParts[2])}-3'`, `${formatSeq(bParts[2])}-5'`
+                `5'-${tParts[0]}-`, `3'-${bParts[0]}-`, 
+                `${tParts[2]}-3'`, `${bParts[2]}-5'`
             );
             
-            this.appStep = 2; this.circSelector.hide(); this.linSelector.reset(); this.linSelector.show();
+            this.appStep = 2; 
+            document.getElementById('input-step-label').innerText = "当前操作：线性片段序列";
+            document.getElementById('input-top-seq').value = this.linTop;
+            document.getElementById('input-bot-seq').value = this.linBot;
+
+            this.circSelector.hide(); 
+            this.updateLinearSelector();
+            this.linSelector.show();
+            
             document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：片段提取";
             
             if (fT === "" && fB === "") {
                 document.getElementById('status-text').innerText = "载体已被线性化切开！请直接开始拼合操作。";
-                this.showModal("载体被切开", "<b>检测到单端切割</b><br>载体环已经断开，但并没有片段被提取出来（这被称为质粒的线性化）。请在此基础上继续操作。");
+                this.showModal("载体被切开", "<b>检测到单端切割</b><br>载体环已经断开，但并没有片段被提取出来（质粒线性化）。请在此基础上继续操作。");
             } else {
                 document.getElementById('status-text').innerText = "载体已切开！请在右侧预览图上【向上拖拽】拔出旧片段。";
-                this.showModal("载体已切开", "<b>第二步：提取旧片段并准备新基因</b><br>载体现在出现了缺口。请在右侧 3D 预览区<b>向上拖拽</b>把不需要的片段拔出来。如果末端有粘性突出，会被精准保留下来。");
+                this.showModal("载体已切开", "<b>第二步：提取旧片段并准备新基因</b><br>载体现在出现了缺口。请在右侧 3D 预览区<b>向上拖拽</b>把不需要的片段拔出来。然后在左侧自定义您的目标基因进行替换。");
             }
         } else {
-            let fT = formatSeq(tParts[1]); this.plasmidPanel.fragTop = fT ? fT + "-" : "";
-            let fB = formatSeq(bParts[1]); this.plasmidPanel.fragBot = fB ? fB + "-" : "";
+            let fT = tParts[1]; this.plasmidPanel.fragTop = fT ? fT + "-" : "";
+            let fB = bParts[1]; this.plasmidPanel.fragBot = fB ? fB + "-" : "";
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.setStaticState("insert", 0.0);
             document.getElementById('status-text').innerText = "新基因就绪！请在右侧预览图上【向下拖拽】将其嵌入载体。";
-            this.showModal("新基因已就绪", "<b>第三步：重组拼合</b><br>你已经选择了目标基因。请在右侧 3D 预览区<b>向下拖拽</b>将新片段送入载体缺口。注意配对问题。");
+            this.showModal("新基因已就绪", "<b>第三步：重组拼合</b><br>你已经选择了目标基因。请在右侧 3D 预览区<b>向下拖拽</b>将新片段送入载体缺口。注意观察末端的切口形状是否契合配对！");
         }
     }
 
@@ -532,7 +638,7 @@ class MainApp {
             if (isComplementary(cleanSeq(p.vecLTop)+cleanSeq(p.fragTop)+cleanSeq(p.vecRTop), cleanSeq(p.vecLBot)+cleanSeq(p.fragBot)+cleanSeq(p.vecRBot))) {
                 p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
                 this.showModal("🎉 重组成功！", "<b>太棒了！</b> 新基因已由于粘性末端的精准配对，完美整合进载体中。<br><br>科学探索永无止境，希望你能继续保持这份好奇心！", "完成实验");
-            } else alert("❌ 拼合失败：碱基不配对或发生干涉！提示：尝试使用控制栏的【旋转】或【翻转】对片段进行调整。");
+            } else alert("❌ 拼合失败：碱基不配对或发生物理干涉！提示：尝试使用控制栏的【旋转】或【翻转】对片段进行调整。");
         } else {
             alert("⚠️ 请将片段拖拽到最上方或缺口中心位置再点击拼合！");
         }
