@@ -23,9 +23,11 @@ class PlasmidPanel {
         
         this.vectorColor = "rgba(168, 230, 207, 0.85)";
         this.fragmentColor = "rgba(255, 180, 130, 0.85)";
-        this.degPerToken = 3.0;
+        
+        // 【核心修改】统一左右圆环的缩放与字体跨度
+        this.degPerToken = 8.5; 
         this.centerTheta = 90.0;
-        this.SCALE = 220.0;
+        this.SCALE = 200.0; 
         this.CX = 400; this.CY = 400;
 
         this.mode = "extract";
@@ -116,7 +118,7 @@ class PlasmidPanel {
 
         this.canvas.addEventListener('mousemove', e => moveHandler(e.clientY));
         this.canvas.addEventListener('touchmove', e => {
-            e.preventDefault(); // 防止iPad滚动
+            e.preventDefault(); 
             moveHandler(e.touches[0].clientY);
         }, {passive: false});
     }
@@ -161,7 +163,7 @@ class PlasmidPanel {
         let startTh = anchor === "start" ? edgeAngle + offset*alignDir : edgeAngle - (n-1)*this.degPerToken*alignDir - offset*alignDir;
 
         this.ctx.fillStyle = "#000";
-        this.ctx.font = "bold 16px 'Segoe UI', Arial";
+        this.ctx.font = "bold 22px 'Segoe UI', Arial"; // 统一字号
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
@@ -183,8 +185,9 @@ class PlasmidPanel {
         this.ctx.fillStyle = "#fafafa"; 
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
-        let rOutE = 1.0, w = 0.15, rMid = rOutE - w;
-        let rOutT = rOutE - w/2, rInT = rMid - w/2;
+        // 【核心修改】计算比例，确保与左侧的 190 和 150 半径视觉上 100% 重合
+        let rOutE = 1.05, w = 0.20, rMid = rOutE - w; // 对应边界 210, 170, 130
+        let rOutT = rOutE - w/2, rInT = rMid - w/2;   // 对应文字 190, 150
 
         let spanOuter = getTokens(this.fragTop).length * this.degPerToken;
         let cLOut = this.centerTheta + spanOuter / 2.0;
@@ -223,12 +226,12 @@ class PlasmidPanel {
             }
 
             if (this.isSelfLigating) {
-                let rSmall = 45;
+                let rSmall = 50;
                 let cx = this.CX + fCenter.x * this.SCALE;
                 let cy = this.CY - fCenter.y * this.SCALE;
                 this.ctx.beginPath();
                 this.ctx.strokeStyle = this.fragmentColor;
-                this.ctx.lineWidth = 36;
+                this.ctx.lineWidth = 40;
                 let currentAngle = 360 * this.selfLigationProgress;
                 this.ctx.arc(cx, cy, rSmall, (-90 - currentAngle/2)*Math.PI/180, (-90 + currentAngle/2)*Math.PI/180);
                 this.ctx.stroke();
@@ -254,10 +257,9 @@ class CircularGeneSelector {
         this.starts = [-1, -1];
         this.ends = [-1, -1];
         
-        // 【修改点】字体变大、序列变长（加入了-），调整单位弧度
-        this.degPerUnit = 9.0; 
-        // 【修改点】让 rOut (170) 和 rIn (130) 两条轨道间距等于 lineWidth (40)，彻底消除空隙
-        this.rOut = 170; this.rIn = 130; 
+        this.degPerUnit = 8.5; 
+        // 【核心修改】精准对应右侧面板的视觉半径
+        this.rOut = 190; this.rIn = 150; 
         
         const interactionEvent = e => {
             e.preventDefault();
@@ -277,8 +279,11 @@ class CircularGeneSelector {
     getRowParts(row) {
         if (this.starts[row] === -1) return null;
         let s = this.sequences[row];
-        if (this.ends[row] === -1) return [s.substring(0, this.starts[row]), "", s.substring(this.starts[row])];
-        return [s.substring(0, this.starts[row]), s.substring(this.starts[row], this.ends[row]), s.substring(this.ends[row])];
+        if (this.ends[row] === -1) return [s.substring(0, this.starts[row]), "", s.substring(this.starts[row] + 1)];
+        let st = Math.min(this.starts[row], this.ends[row]);
+        let ed = Math.max(this.starts[row], this.ends[row]);
+        // 【核心修改】精准切除截断位置的 '-'，避免拖泥带水
+        return [s.substring(0, st), s.substring(st + 1, ed), s.substring(ed + 1)];
     }
 
     handleInteraction(x, y) {
@@ -287,9 +292,8 @@ class CircularGeneSelector {
         let dist = Math.sqrt(dx*dx + dy*dy);
 
         let row = -1;
-        // 【修改点】扩展热区半径匹配 lineWidth (正负20px)
-        if (dist >= this.rOut-20 && dist <= this.rOut+20) row = 0;
-        else if (dist >= this.rIn-20 && dist <= this.rIn+20) row = 1;
+        if (dist >= 170 && dist <= 210) row = 0;
+        else if (dist >= 130 && dist < 170) row = 1;
 
         if (row !== -1) {
             let angleDeg = Math.atan2(dx, dy) * 180 / Math.PI;
@@ -300,14 +304,21 @@ class CircularGeneSelector {
             if (rel >= 360) rel -= 360;
             
             let idx = Math.round(rel / this.degPerUnit);
-            if (idx >= 0 && idx <= n) {
+
+            // 【核心修改】强制吸附到 '-' 的位置（奇数索引）
+            if (idx % 2 === 0) {
+                if (rel / this.degPerUnit > idx) idx += 1;
+                else idx -= 1;
+            }
+            // 限制首尾边界
+            if (idx < 1) idx = 1;
+            if (idx > n - 2) idx = n - 2;
+
+            if (idx >= 1 && idx <= n - 2) {
                 if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) {
                     this.starts[row] = idx; this.ends[row] = -1;
                 } else {
                     this.ends[row] = idx;
-                    if (this.starts[row] > this.ends[row]) {
-                        [this.starts[row], this.ends[row]] = [this.ends[row], this.starts[row]];
-                    }
                 }
                 this.paint();
             }
@@ -318,14 +329,12 @@ class CircularGeneSelector {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
         let cx = this.canvas.width/2, cy = this.canvas.height/2;
 
-        // 【修改点】线宽等于内外圆间距 (170 - 130 = 40)
         this.ctx.lineWidth = 40;
         this.ctx.strokeStyle = "rgba(168, 230, 207, 0.4)";
         this.ctx.beginPath(); this.ctx.arc(cx, cy, this.rOut, 0, Math.PI*2); this.ctx.stroke();
         this.ctx.beginPath(); this.ctx.arc(cx, cy, this.rIn, 0, Math.PI*2); this.ctx.stroke();
 
-        // 【修改点】增大字号至 24px
-        this.ctx.font = "bold 24px Arial";
+        this.ctx.font = "bold 22px Arial";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
@@ -339,18 +348,25 @@ class CircularGeneSelector {
                 let rad = (deg - 90) * Math.PI / 180;
                 let x = cx + r * Math.cos(rad), y = cy + r * Math.sin(rad);
 
-                let isSelected = this.ends[row] !== -1 && (i >= this.starts[row] && i < this.ends[row]);
+                let isSelectedDash = (i === this.starts[row] || i === this.ends[row]);
+                let st = Math.min(this.starts[row], this.ends[row]);
+                let ed = Math.max(this.starts[row], this.ends[row]);
+                let isSelected = this.ends[row] !== -1 && (i > st && i < ed);
+
                 this.ctx.fillStyle = isSelected ? "red" : "black";
                 this.ctx.save();
                 this.ctx.translate(x, y); this.ctx.rotate(rad + Math.PI/2);
-                this.ctx.fillText(seq[i], 0, 0);
+                
+                // 【核心修改】如果是选中的切口处，用红线代替 '-' 字符
+                if (!isSelectedDash) {
+                    this.ctx.fillText(seq[i], 0, 0);
+                }
                 this.ctx.restore();
 
-                if (i === this.starts[row] || i === this.ends[row]) {
-                    let lineRad = ((i * this.degPerUnit) - offset - 90) * Math.PI / 180;
+                if (isSelectedDash) {
+                    let lineRad = ((i * this.degPerUnit) - offset + (this.degPerUnit / 2.0) - 90) * Math.PI / 180;
                     this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4;
                     this.ctx.beginPath();
-                    // 【修改点】切割红线跨度覆盖整个轨道宽度 (r-20 到 r+20)
                     this.ctx.moveTo(cx + (r-20)*Math.cos(lineRad), cy + (r-20)*Math.sin(lineRad));
                     this.ctx.lineTo(cx + (r+20)*Math.cos(lineRad), cy + (r+20)*Math.sin(lineRad));
                     this.ctx.stroke();
@@ -371,7 +387,6 @@ class GeneSegmentSelector {
         this.starts = [-1, -1];
         this.ends = [-1, -1];
         
-        // 【修改点】因为包含了 -，长度加倍，单位距离缩减以适应屏幕
         this.unit = 18; this.startX = 40; this.cy = 250; 
         
         const interactionEvent = e => {
@@ -392,24 +407,34 @@ class GeneSegmentSelector {
     getRowParts(row) {
         if (this.starts[row] === -1 || this.ends[row] === -1) return null;
         let s = this.sequences[row];
-        return [s.substring(0, this.starts[row]), s.substring(this.starts[row], this.ends[row]), s.substring(this.ends[row])];
+        let st = Math.min(this.starts[row], this.ends[row]);
+        let ed = Math.max(this.starts[row], this.ends[row]);
+        return [s.substring(0, st), s.substring(st + 1, ed), s.substring(ed + 1)];
     }
 
     handleInteraction(x, y) {
         let row = -1;
-        // 【修改点】扩大热区并完美无缝连接（cy为分界线，上下各50px跨度）
-        if (y >= this.cy - 50 && y < this.cy) row = 0;
-        else if (y >= this.cy && y <= this.cy + 50) row = 1;
+        if (y >= this.cy - 40 && y < this.cy) row = 0;
+        else if (y >= this.cy && y <= this.cy + 40) row = 1;
 
         if (row !== -1) {
-            let idx = Math.round((x - this.startX + this.unit/2) / this.unit);
+            let idx = Math.round((x - this.startX) / this.unit);
             let n = this.sequences[row].length;
-            if (idx >= 0 && idx <= n) {
+
+            // 强制吸附到 '-'
+            if (idx % 2 === 0) {
+                if ((x - this.startX) / this.unit > idx) idx += 1;
+                else idx -= 1;
+            }
+
+            if (idx < 1) idx = 1;
+            if (idx > n - 2) idx = n - 2;
+
+            if (idx >= 1 && idx <= n - 2) {
                 if (this.starts[row] === -1 || (this.starts[row] !== -1 && this.ends[row] !== -1)) {
                     this.starts[row] = idx; this.ends[row] = -1;
                 } else {
                     this.ends[row] = idx;
-                    if (this.starts[row] > this.ends[row]) [this.starts[row], this.ends[row]] = [this.ends[row], this.starts[row]];
                 }
                 this.paint();
             }
@@ -418,30 +443,34 @@ class GeneSegmentSelector {
 
     paint() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        // 【修改点】大字号适配 iPad
-        this.ctx.font = "bold 24px Arial";
+        this.ctx.font = "bold 22px Arial";
         this.ctx.textAlign = "center";
         this.ctx.textBaseline = "middle";
 
         for (let row = 0; row < 2; row++) {
             let seq = this.sequences[row];
-            // 【修改点】控制矩形Y轴贴近，使两块蓝色背景严格在 this.cy 处无缝对接
-            let yPos = row === 0 ? this.cy - 25 : this.cy + 25;
+            let yPos = row === 0 ? this.cy - 20 : this.cy + 20;
             
             this.ctx.fillStyle = "rgba(168, 230, 207, 0.5)";
-            this.ctx.fillRect(this.startX - this.unit/2, yPos - 25, seq.length * this.unit, 50);
+            this.ctx.fillRect(this.startX - this.unit/2, yPos - 20, seq.length * this.unit, 40);
 
             for (let i = 0; i < seq.length; i++) {
                 let x = this.startX + i * this.unit;
-                let isSelected = this.ends[row] !== -1 && (i >= this.starts[row] && i < this.ends[row]);
-                this.ctx.fillStyle = isSelected ? "red" : "black";
-                this.ctx.fillText(seq[i], x, yPos);
+                let isSelectedDash = (i === this.starts[row] || i === this.ends[row]);
+                let st = Math.min(this.starts[row], this.ends[row]);
+                let ed = Math.max(this.starts[row], this.ends[row]);
+                let isSelected = this.ends[row] !== -1 && (i > st && i < ed);
 
-                if (i === this.starts[row] || i === this.ends[row]) {
+                this.ctx.fillStyle = isSelected ? "red" : "black";
+                
+                // 与圆环一致，用红线代替字符
+                if (!isSelectedDash) {
+                    this.ctx.fillText(seq[i], x, yPos);
+                } else {
                     this.ctx.strokeStyle = "red"; this.ctx.lineWidth = 4;
                     this.ctx.beginPath(); 
-                    this.ctx.moveTo(x - this.unit/2, yPos - 25); 
-                    this.ctx.lineTo(x - this.unit/2, yPos + 25); 
+                    this.ctx.moveTo(x, yPos - 20); 
+                    this.ctx.lineTo(x, yPos + 20); 
                     this.ctx.stroke();
                 }
             }
@@ -454,9 +483,6 @@ class GeneSegmentSelector {
 // ==========================================
 class MainApp {
     constructor() {
-        // 【修改点】在初始数据中显式插入 "-" 作为间隔符
-        // 配合 getTokens 和 cleanSeq 逻辑，这种写法不仅在左侧切割面板具有良好的文字间隔
-        // 在传入 3D 形变渲染时依然会100%完美映射。
         this.INITIAL_SEQ_TOP = "A-T-G-C-G-T-A-A-T-A-G-C"; 
         this.INITIAL_SEQ_BOT = "T-A-C-G-C-A-T-T-A-T-C-G";
         this.LINEAR_GENE_TOP = "G-G-A-T-C-C-A-A-G-C-T-T"; 
