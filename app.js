@@ -440,10 +440,10 @@ class GeneSegmentSelector {
 // ==========================================
 class MainApp {
     constructor() {
-        this.DEFAULT_CIRC_TOP = "ATGCGTAATAGC"; 
-        this.DEFAULT_CIRC_BOT = "TACGCATTATCG";
-        this.DEFAULT_LIN_TOP = "GGATCCAAGCTT"; 
-        this.DEFAULT_LIN_BOT = "CCTAGGTTCGAA";
+        this.DEFAULT_CIRC_TOP = "GGATCCAAGCTT"; 
+        this.DEFAULT_CIRC_BOT = "CCTAGGTTCGAA";
+        this.DEFAULT_LIN_TOP = "ATGCGTAATAGC"; 
+        this.DEFAULT_LIN_BOT = "TACGCATTATCG";
 
         this.circTop = autoFormatATCG(this.DEFAULT_CIRC_TOP);
         this.circBot = autoFormatATCG(this.DEFAULT_CIRC_BOT);
