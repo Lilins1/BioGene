@@ -2,10 +2,9 @@
 // 辅助工具函数 (智能排版与解析引擎)
 // ==========================================
 
-// 【核心新增】智能排版：仅在相邻的大写 A, T, C, G 之间自动插入连字符。单词(如 Gene)保持完整。
+// 智能排版：仅在相邻的大写 A, T, C, G 之间自动插入连字符。单词(如 Gene)保持完整。
 function autoFormatATCG(seq) {
     if (!seq) return "";
-    // 自动寻找连续的 ATCG 并在中间插入 '-'
     return seq.replace(/([ATCG])(?=[ATCG])/g, '$1-');
 }
 
@@ -14,11 +13,9 @@ function cleanSeq(seq) {
 }
 
 function getTokens(text) { 
-    // 将序列拆分为独立渲染单元，单词将被拆为单个字母跟随圆环曲率渲染
     return (text || "").match(/5'|3'|\.{2,}|./g) || []; 
 }
 
-// 【优化匹配逻辑】放宽限制，使得自定义单词(如 Gene 与 Gene)也能直接判定为配对成功
 function isComplementary(top, bot) {
     if (top.length !== bot.length || top.length === 0) return false;
     for (let i = 0; i < top.length; i++) {
@@ -34,7 +31,7 @@ function isComplementary(top, bot) {
 }
 
 // ==========================================
-// 类：3D 形变渲染区
+// 类：3D 形变渲染区 (严密物理干涉检测系统)
 // ==========================================
 class PlasmidPanel {
     constructor(canvasId) {
@@ -92,7 +89,6 @@ class PlasmidPanel {
 
                 let nT = cleanSeq(this.fragBot).split('').reverse().join('');
                 let nB = cleanSeq(this.fragTop).split('').reverse().join('');
-                // 翻转后重新应用智能排版
                 this.fragTop = autoFormatATCG(nT) + (nT ? "-" : ""); 
                 this.fragBot = autoFormatATCG(nB) + (nB ? "-" : "");
                 this.paint();
@@ -231,9 +227,10 @@ class PlasmidPanel {
 
         let vTL, vTR;
         if (lenFT === 0 && lenFB === 0) {
-            let minGap = this.isClosedCircle ? 0 : 1.0; 
-            vTL = 90 + minGap * deg;
-            vTR = 90 - minGap * deg;
+            // 【问题2修复】：单端切割时，如果存在斜向切口(lOffTokens!=0)，需要额外拉开足够的防碰撞间隙
+            let totalGap = this.isClosedCircle ? 0 : (Math.abs(lOffTokens) + 1.0); 
+            vTL = 90 + (totalGap / 2.0) * deg;
+            vTR = 90 - (totalGap / 2.0) * deg;
         } else {
             vTL = Math.max(fTL, fBL + lOffTokens * deg);
             vTR = Math.min(fTR, fBR + rOffTokens * deg);
@@ -311,7 +308,7 @@ class PlasmidPanel {
 }
 
 // ==========================================
-// 类：圆环选取器 (步骤 1)
+// 类：圆环选取器
 // ==========================================
 class CircularGeneSelector {
     constructor(canvasId) {
@@ -342,7 +339,6 @@ class CircularGeneSelector {
             let seq = this.sequences[row], n = seq.length, off = (n * this.degPerUnit) / 2.0, rel = aD + off; if (rel >= 360) rel -= 360;
             let exactIdx = rel / this.degPerUnit;
             
-            // 【核心规则1】：仅在距离足够近时，寻找且吸附到 '-' 字符
             let closestDash = -1, minDist = 1.5; 
             for(let i=0; i<n; i++) {
                 if(seq[i] === '-') {
@@ -383,7 +379,7 @@ class CircularGeneSelector {
 }
 
 // ==========================================
-// 类：线性片段选取器 (步骤 2)
+// 类：线性片段选取器
 // ==========================================
 class GeneSegmentSelector {
     constructor(canvasId) {
@@ -410,7 +406,6 @@ class GeneSegmentSelector {
         if (row !== -1) {
             let seq = this.sequences[row], n = seq.length, exactIdx = (x - this.startX) / this.unit;
             
-            // 【核心规则2】：同圆环，限制提取边界必须锁定在 '-' 号上
             let closestDash = -1, minDist = 1.5;
             for(let i=0; i<n; i++) {
                 if(seq[i] === '-') {
@@ -450,7 +445,6 @@ class MainApp {
         this.DEFAULT_LIN_TOP = "GGATCCAAGCTT"; 
         this.DEFAULT_LIN_BOT = "CCTAGGTTCGAA";
 
-        // 初次加载时自动进行 ATCG 格式排版
         this.circTop = autoFormatATCG(this.DEFAULT_CIRC_TOP);
         this.circBot = autoFormatATCG(this.DEFAULT_CIRC_BOT);
         this.linTop = autoFormatATCG(this.DEFAULT_LIN_TOP);
@@ -491,7 +485,6 @@ class MainApp {
             this.plasmidPanel.startYRotationAnimation();
         });
 
-        // 绑定：自定义序列操作面板 (重置)
         document.getElementById('btn-reset-seq').addEventListener('click', () => {
             if (this.appStep === 1) {
                 this.circTop = autoFormatATCG(this.DEFAULT_CIRC_TOP);
@@ -508,13 +501,11 @@ class MainApp {
             }
         });
 
-        // 绑定：自定义序列操作面板 (应用)
         document.getElementById('btn-apply-seq').addEventListener('click', () => {
             let tVal = document.getElementById('input-top-seq').value.trim();
             let bVal = document.getElementById('input-bot-seq').value.trim();
             if(!tVal || !bVal) return alert("⚠️ 序列不能为空！");
             
-            // 应用智能格式化，保留手动输入的特殊词
             tVal = autoFormatATCG(tVal);
             bVal = autoFormatATCG(bVal);
             document.getElementById('input-top-seq').value = tVal;
@@ -541,7 +532,6 @@ class MainApp {
     resetState() {
         this.appStep = 1; 
         
-        // 更新 UI 输入框内容
         document.getElementById('input-step-label').innerText = "当前操作：载体序列";
         document.getElementById('input-top-seq').value = this.circTop;
         document.getElementById('input-bot-seq').value = this.circBot;
@@ -635,10 +625,27 @@ class MainApp {
                 this.showModal("发现自连现象！", "载体自己闭合了。在现实实验中，我们需要使用去磷酸化酶来防止这种情况发生。");
             } else alert("❌ 无法闭合：末端碱基不匹配！");
         } else if (isInside) {
-            if (isComplementary(cleanSeq(p.vecLTop)+cleanSeq(p.fragTop)+cleanSeq(p.vecRTop), cleanSeq(p.vecLBot)+cleanSeq(p.fragBot)+cleanSeq(p.vecRBot))) {
+            // 【问题1修正】：物理干涉检测，双重锁定拼合逻辑
+            let lenFT = getTokens(p.fragTop).length;
+            let lenFB = getTokens(p.fragBot).length;
+            let lOffTokens = getTokens(p.vecLBot).length - getTokens(p.vecLTop).length;
+            let rOffTokens = getTokens(p.vecRTop).length - getTokens(p.vecRBot).length;
+            
+            // 严密检查左侧和右侧粘性末端的物理形状是否完美契合
+            let fitsPhysically = (p.fragOffset === lOffTokens) && ((p.fragOffset + lenFB - lenFT) === rOffTokens);
+
+            // 检查碱基对字母是否配对
+            let isComp = isComplementary(
+                cleanSeq(p.vecLTop)+cleanSeq(p.fragTop)+cleanSeq(p.vecRTop), 
+                cleanSeq(p.vecLBot)+cleanSeq(p.fragBot)+cleanSeq(p.vecRBot)
+            );
+
+            if (fitsPhysically && isComp) {
                 p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
-                this.showModal("🎉 重组成功！", "<b>太棒了！</b> 新基因已由于粘性末端的精准配对，完美整合进载体中。<br><br>科学探索永无止境，希望你能继续保持这份好奇心！", "完成实验");
-            } else alert("❌ 拼合失败：碱基不配对或发生物理干涉！提示：尝试使用控制栏的【旋转】或【翻转】对片段进行调整。");
+                this.showModal("🎉 重组成功！", "<b>太棒了！</b> 新基因已完美整合进载体中。<br><br>科学探索永无止境，希望你能继续保持这份好奇心！", "完成实验");
+            } else {
+                alert("❌ 拼合失败：碱基不配对或发生物理形状干涉！\n提示：请检查提取片段的粘性末端形状是否与载体缺口一致，或尝试使用【旋转】/【翻转】按钮调整。");
+            }
         } else {
             alert("⚠️ 请将片段拖拽到最上方或缺口中心位置再点击拼合！");
         }
