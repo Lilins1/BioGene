@@ -14,20 +14,20 @@
                 <p id="status-text">请在下方序列上点击（-）连字符位置选择切割位点（红线）</p>
             </div>
             
-            <div class="sequence-inputs" style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #dee2e6;">
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">上链:</label>
-                    <input type="text" id="input-top-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
+            <div class="sequence-inputs">
+                <div class="seq-row">
+                    <label>上链:</label>
+                    <input type="text" id="input-top-seq" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
                 </div>
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">下链:</label>
-                    <input type="text" id="input-bot-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列..." />
+                <div class="seq-row">
+                    <label>下链:</label>
+                    <input type="text" id="input-bot-seq" placeholder="输入基因序列..." />
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span id="input-step-label" style="font-size: 13px; color: #e67e22; font-weight: bold;">当前操作：载体序列</span>
-                    <div style="display: flex; gap: 10px;">
-                        <button id="btn-reset-seq" class="btn secondary" style="padding: 6px 12px; font-size: 13px;">恢复默认</button>
-                        <button id="btn-apply-seq" class="btn primary" style="padding: 6px 12px; font-size: 13px;">应用修改</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                    <span id="input-step-label" style="font-size: 12px; color: #e67e22; font-weight: bold;">当前：载体序列</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-reset-seq" class="btn secondary" style="padding: 4px 10px; font-size: 12px;">恢复</button>
+                        <button id="btn-apply-seq" class="btn primary" style="padding: 4px 10px; font-size: 12px;">应用</button>
                     </div>
                 </div>
             </div>
@@ -43,16 +43,16 @@
 
         <div id="right-panel">
             <div class="panel-header">
-                <h2>3D 仿真预览 (拖拽鼠标控制形变)</h2>
+                <h2>3D 仿真预览 (拖拽鼠标/手指控制形变)</h2>
             </div>
             <div id="preview-container">
                 <canvas id="previewCanvas" width="800" height="800"></canvas>
             </div>
             <div class="control-bar action-bar">
-                <button id="btn-reset" class="btn danger">重置 (Reset)</button>
-                <button id="btn-rotate-z" class="btn secondary">🔄 平面旋转</button>
-                <button id="btn-rotate-y" class="btn secondary">↔️ 水平翻转</button>
-                <button id="btn-ligate" class="btn success">🔗 检查并拼合</button>
+                <button id="btn-reset" class="btn danger">🗑️ 重置</button>
+                <button id="btn-rotate-z" class="btn secondary">🔄 旋转</button>
+                <button id="btn-rotate-y" class="btn secondary">↔️ 翻转</button>
+                <button id="btn-ligate" class="btn success">🔗 拼合</button>
             </div>
         </div>
     </div>
