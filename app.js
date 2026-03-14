@@ -67,7 +67,7 @@ class PlasmidPanel {
         this.insertDistance = 1.0;
         
         this.rotationAngleZ = 0.0; 
-        this.rotationAngleY = 0.0; 
+        // 【删除项】移除了 rotationAngleY
         this.isRotating = false;
         this.isSelfLigating = false;
         this.selfLigationProgress = 0.0;
@@ -77,7 +77,7 @@ class PlasmidPanel {
         this.vecLTop = ""; this.vecLBot = "";
         this.vecRTop = ""; this.vecRBot = "";
         this.fragOffset = 0; 
-        this.fragDirection = 1; // 1 = 从左向右, -1 = 从右向左
+        this.fragDirection = 1; 
         this.geneLabel = ""; 
         
         this.setupInteractions();
@@ -106,7 +106,7 @@ class PlasmidPanel {
                 let oldFTLen = getTokens(this.fragTop).length;
                 let oldFBLen = getTokens(this.fragBot).length;
                 this.fragOffset = this.fragOffset + oldFBLen - oldFTLen;
-                this.fragDirection *= -1; // 反转方向
+                this.fragDirection *= -1; 
 
                 let nT = cleanSeq(this.fragBot).split('').reverse().join('');
                 let nB = cleanSeq(this.fragTop).split('').reverse().join('');
@@ -122,33 +122,7 @@ class PlasmidPanel {
         requestAnimationFrame(animate);
     }
 
-    startYRotationAnimation() {
-        if (this.isRotating || this.isSelfLigating) return;
-        this.isRotating = true;
-        let start = performance.now();
-        const animate = (time) => {
-            let p = (time - start) / 600.0;
-            if (p >= 1.0) {
-                this.isRotating = false;
-                this.rotationAngleY = 0;
-                let oldFTLen = getTokens(this.fragTop).length;
-                let oldFBLen = getTokens(this.fragBot).length;
-                this.fragOffset = oldFTLen - oldFBLen - this.fragOffset;
-                this.fragDirection *= -1; // 反转方向
-
-                let nT = cleanSeq(this.fragTop).split('').reverse().join('');
-                let nB = cleanSeq(this.fragBot).split('').reverse().join('');
-                this.fragTop = autoFormatATCG(nT) + (nT ? "-" : ""); 
-                this.fragBot = autoFormatATCG(nB) + (nB ? "-" : "");
-                this.paint();
-            } else {
-                this.rotationAngleY = p * 180;
-                this.paint();
-                requestAnimationFrame(animate);
-            }
-        };
-        requestAnimationFrame(animate);
-    }
+    // 【删除项】移除了 startYRotationAnimation 方法
 
     startSelfLigationAnimation() {
         if (this.isSelfLigating || this.isRotating) return;
@@ -279,7 +253,6 @@ class PlasmidPanel {
         let vL_bot = vL - lOffTokens * deg;
         let vR_bot = vR - rOffTokens * deg;
 
-        // 渲染载体上的顺时针绿色箭头
         this.drawMorphedLayer(rMid, rOutE, vL, vR, this.vectorColor, 0, 0, rMid);
         this.drawMorphedLayer(rMid-w, rMid, vL_bot, vR_bot, this.vectorColor, 0, 0, rMid);
         
@@ -316,7 +289,7 @@ class PlasmidPanel {
             
             this.ctx.translate(this.CX + fCenter.x * this.SCALE, this.CY - fCenter.y * this.SCALE);
             if (this.rotationAngleZ !== 0) this.ctx.rotate(this.rotationAngleZ * Math.PI / 180);
-            if (this.rotationAngleY !== 0) this.ctx.scale(Math.cos(this.rotationAngleY * Math.PI / 180), 1);
+            // 【删除项】移除了 rotationAngleY 的 scale 变换
             this.ctx.translate(-(this.CX + fCenter.x * this.SCALE), -(this.CY - fCenter.y * this.SCALE));
             
             if (this.isSelfLigating) {
@@ -347,7 +320,6 @@ class PlasmidPanel {
                     this.drawMorphedText(this.fragBot, rInT, fBL, -1, "start", tMorph, currentDist, rMid);
                 }
                 
-                // 渲染提取片段的橙色方向指示箭头
                 let arrR = rOutE + 0.15;
                 this.ctx.beginPath();
                 let stepsArr = 20, stepA = (fTR - fTL) / stepsArr;
@@ -372,7 +344,6 @@ class PlasmidPanel {
                 this.ctx.lineTo(ex - 12*Math.cos(angle + Math.PI/6), ey - 12*Math.sin(angle + Math.PI/6));
                 this.ctx.stroke();
 
-                // 在3D箭头上方绘制基因标识名称 (仅在 geneLabel 不为空时显示)
                 if (this.geneLabel) {
                     let textP = this.morphPoint(arrR + 0.12, 90, tMorph, currentDist, rMid);
                     this.ctx.save();
@@ -584,7 +555,6 @@ class GeneSegmentSelector {
             this.ctx.lineWidth = 3; 
             this.ctx.stroke();
 
-            // 在2D箭头上方绘制基因标识名称
             if (this.geneLabel) {
                 this.ctx.fillStyle = "#e67e22";
                 this.ctx.font = "bold 18px Arial";
@@ -665,12 +635,7 @@ class MainApp {
             this.plasmidPanel.startZRotationAnimation();
         });
 
-        document.getElementById('btn-rotate-y').addEventListener('click', () => {
-            let p = this.plasmidPanel.progress, m = this.plasmidPanel.mode;
-            let isAway = (m === "extract" && p > 0.8) || (m === "insert" && p < 0.2);
-            if (!isAway) return this.showModal("提示", "请先将片段向上拉拽到远离载体的位置（最上方）再进行水平翻转。");
-            this.plasmidPanel.startYRotationAnimation();
-        });
+        // 【删除项】移除了 btn-rotate-y 的事件监听器绑定
 
         document.getElementById('btn-act1').addEventListener('click', () => {
             this.currentMode = "act1";
@@ -743,7 +708,7 @@ class MainApp {
         this.plasmidPanel.fragOffset = 0;
         this.plasmidPanel.fragDirection = 1; 
         this.plasmidPanel.isClosedCircle = true; 
-        this.plasmidPanel.geneLabel = ""; // 【核心修复】载体原片段拉出时不显示名称
+        this.plasmidPanel.geneLabel = ""; 
         
         this.plasmidPanel.setSequences("", "", `${vLT}`, `${vLB}`, `${vRT}`, `${vRB}`);
         this.plasmidPanel.setStaticState("extract", 0.0);
@@ -769,7 +734,7 @@ class MainApp {
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.isClosedCircle = false; 
             this.plasmidPanel.fragDirection = 1; 
-            this.plasmidPanel.geneLabel = ""; // 【核心修复】切割出的废弃原片段不挂载基因名
+            this.plasmidPanel.geneLabel = ""; 
             
             this.plasmidPanel.setSequences(fT, fB, `5'-${tParts[0]}-`, `3'-${bParts[0]}-`, `${tParts[2]}-3'`, `${bParts[2]}-5'`);
             
@@ -796,7 +761,7 @@ class MainApp {
             let fB = bParts[1]; this.plasmidPanel.fragBot = fB ? fB + "-" : "";
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.fragDirection = 1;
-            this.plasmidPanel.geneLabel = this.geneLabel; // 【核心修复】新提取的片段挂载基因名称
+            this.plasmidPanel.geneLabel = this.geneLabel; 
             this.plasmidPanel.setStaticState("insert", 0.0);
             document.getElementById('status-text').innerText = "目标片段就绪！请向下拉拽将其嵌入。";
             this.showModal("提示", "新片段已就绪。请向下拖拽嵌入载体，并点击【拼合】按钮进行检查。");
@@ -834,11 +799,12 @@ class MainApp {
             let isComp = isComplementary(fullTop, fullBot);
 
             if (fitsPhysically && isComp) {
+                p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
+                
                 if (p.fragDirection === 1) {
-                    p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
                     this.showModal("🎉 拼接成功", "新片段完美整合进载体中，方向正确，连接成功！");
                 } else {
-                    this.showModal("❌ 拼接失败：方向错误", "虽然切口与碱基配对了，但片段被颠倒了！基因的读取方向（箭头）必须与载体顺时针方向一致。");
+                    this.showModal("⚠️ 拼接成功但方向反转", "切口与碱基均已正确配对，片段成功连入载体！<br><br><b>注意：</b>因为基因序列被颠倒，读取方向（箭头）与载体启动子方向不一致。这在物理上可以连接，但在生物学上<b>无法正常表达靶蛋白</b>！");
                 }
             } else if (!fitsPhysically) {
                 this.showModal("❌ 拼接失败：形状干涉", "插入片段的末端形状与载体缺口不一致，发生了物理干涉！");
