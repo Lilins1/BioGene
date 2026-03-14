@@ -690,6 +690,7 @@ class MainApp {
             }
         } else if (isInside) {
             // 场景 2：片段被拉进缺口内部，检查重组
+            
 
             // 规则 A：空片段检查
             if (lenFT === 0 && lenFB === 0) {
