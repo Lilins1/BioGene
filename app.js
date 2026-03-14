@@ -1,6 +1,8 @@
 // ==========================================
 // 辅助工具函数 (智能排版与解析引擎)
 // ==========================================
+
+// 智能排版：仅在相邻的大写 A, T, C, G 之间自动插入连字符。单词(如 Gene)保持完整。
 function autoFormatATCG(seq) {
     if (!seq) return "";
     return seq.replace(/([ATCG])(?=[ATCG])/g, '$1-');
@@ -14,20 +16,29 @@ function getTokens(text) {
     return (text || "").match(/5'|3'|\.{2,}|./g) || []; 
 }
 
+// 【核心修改】：更严谨的碱基互补配对算法
 function isComplementary(top, bot) {
-    if (top.length !== bot.length || top.length === 0) return false;
+    if (!top || !bot || top.length !== bot.length || top.length === 0) return false;
     for (let i = 0; i < top.length; i++) {
-        let t = top[i], b = bot[i];
-        let pair = t.toUpperCase() + b.toUpperCase();
-        if (['AT','TA','CG','GC'].includes(pair)) continue;
-        if (t.toLowerCase() === b.toLowerCase()) continue; 
-        return false;
+        let t = top[i].toUpperCase();
+        let b = bot[i].toUpperCase();
+        
+        let isTStandard = ['A','T','C','G'].includes(t);
+        let isBStandard = ['A','T','C','G'].includes(b);
+        
+        if (isTStandard && isBStandard) {
+            // 如果是标准碱基，必须遵循互补配对原则
+            let pair = t + b;
+            if (!['AT','TA','CG','GC'].includes(pair)) return false;
+        } else {
+            // 如果是占位符（如 'Gene' 中的字母），则要求完全一致才能对齐
+            if (t !== b) return false;
+        }
     }
     return true;
 }
 
 // 【核心修复：坐标缩放转换】
-// 将屏幕上的物理点击坐标，转换为 Canvas 内部的真实坐标
 function getScaledCoords(canvas, e) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -171,7 +182,6 @@ class PlasmidPanel {
             lastY = y;
             this.paint();
         };
-        // 拖拽操作不需要精确转换内部坐标，直接用 clientY 计算差值即可
         this.canvas.addEventListener('mousedown', e => startHandler(e.clientY));
         window.addEventListener('mouseup', () => isDown = false);
         this.canvas.addEventListener('mousemove', e => moveHandler(e.clientY));
@@ -249,7 +259,6 @@ class PlasmidPanel {
             vTR = Math.min(fTR, fBR + rOffTokens * deg);
         }
 
-        // 【确保闭环逻辑】：如果是第一步且设为闭合状态，强制两侧角度合并为 90 度
         if (this.isClosedCircle) {
             vTL = 90;
             vTR = 90;
@@ -339,7 +348,6 @@ class CircularGeneSelector {
         
         const interactionEvent = e => {
             e.preventDefault(); 
-            // 【核心修复：使用缩放转换后的内部坐标】
             const coords = getScaledCoords(this.canvas, e);
             this.handleInteraction(coords.x, coords.y);
         };
@@ -417,7 +425,6 @@ class GeneSegmentSelector {
         
         const interactionEvent = e => {
             e.preventDefault(); 
-            // 【核心修复：使用缩放转换后的内部坐标】
             const coords = getScaledCoords(this.canvas, e);
             this.handleInteraction(coords.x, coords.y);
         };
@@ -509,14 +516,14 @@ class MainApp {
         document.getElementById('btn-rotate-z').addEventListener('click', () => {
             let p = this.plasmidPanel.progress, m = this.plasmidPanel.mode;
             let isAway = (m === "extract" && p > 0.8) || (m === "insert" && p < 0.2);
-            if (!isAway) return alert("⚠️ 请先将片段向上拉拽到远离载体的位置（最上方）再旋转！");
+            if (!isAway) return this.showModal("操作无效", "⚠️ 请先将片段向上拉拽到远离载体的位置（最上方）再进行平面旋转！");
             this.plasmidPanel.startZRotationAnimation();
         });
 
         document.getElementById('btn-rotate-y').addEventListener('click', () => {
             let p = this.plasmidPanel.progress, m = this.plasmidPanel.mode;
             let isAway = (m === "extract" && p > 0.8) || (m === "insert" && p < 0.2);
-            if (!isAway) return alert("⚠️ 请先将片段向上拉拽到远离载体的位置（最上方）再翻转！");
+            if (!isAway) return this.showModal("操作无效", "⚠️ 请先将片段向上拉拽到远离载体的位置（最上方）再进行水平翻转！");
             this.plasmidPanel.startYRotationAnimation();
         });
 
@@ -555,6 +562,7 @@ class MainApp {
             }
         });
 
+        // 绑定拼合事件
         document.getElementById('btn-ligate').addEventListener('click', () => this.executeLigation());
         document.getElementById('btn-cut').addEventListener('click', () => this.executeCut());
     }
@@ -567,7 +575,7 @@ class MainApp {
     resetState() {
         this.appStep = 1; 
         
-        document.getElementById('input-step-label').innerText = "当前：载体序列";
+        document.getElementById('input-step-label').innerText = "当前操作：载体序列";
         document.getElementById('status-text').innerText = "请在下方圆环上点击选择切割位点（红线）";
         document.getElementById('input-top-seq').value = this.circTop;
         document.getElementById('input-bot-seq').value = this.circBot;
@@ -591,15 +599,20 @@ class MainApp {
         );
         this.plasmidPanel.setStaticState("extract", 0.0);
         
-        document.getElementById('step-title').innerText = "交互操作区 - 步骤 1：圆环切割";
-        // 移除启动时的弹窗干扰，直接让用户操作
+        document.getElementById('step-title').innerText = "交互操作区 - 步骤 1: 载体切割";
+        this.showModal(
+            "欢迎来到基因克隆仿真实验", 
+            "<b>第一步：切割载体质粒</b><br><br>1. 左侧面板显示了环状的载体序列。您可以在输入框自定义序列。<br>2. 请在双链的<b>连字符(-)</b>上分别点击，选择您想切断的位置（会标记红线）。<br>3. 选好后点击【执行切割】按钮。"
+        );
     }
 
     executeCut() {
         let activeSel = (this.appStep === 1) ? this.circSelector : this.linSelector;
         let tParts = activeSel.getRowParts(0), bParts = activeSel.getRowParts(1);
         
-        if (!tParts || !bParts) return alert("⚠️ 请先在上下链各选择两个红色的切割标识点！(注：单词内部无法切断)");
+        if (!tParts || !bParts) {
+            return this.showModal("选择不完整", "⚠️ 请先在<b>上下两条链</b>各选择两个红色的切割标识点！<br><br>注意：必须点在连字符(-)上，字母内部无法切断。");
+        }
 
         let getSt = (sel, row) => sel.ends[row] === -1 ? sel.starts[row] : Math.min(sel.starts[row], sel.ends[row]);
         let stT = getSt(activeSel, 0);
@@ -620,7 +633,7 @@ class MainApp {
             );
             
             this.appStep = 2; 
-            document.getElementById('input-step-label').innerText = "当前：线性片段序列";
+            document.getElementById('input-step-label').innerText = "当前操作：供体片段序列";
             document.getElementById('input-top-seq').value = this.linTop;
             document.getElementById('input-bot-seq').value = this.linBot;
 
@@ -628,55 +641,97 @@ class MainApp {
             this.updateLinearSelector();
             this.linSelector.show();
             
-            document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：片段提取";
+            document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：提取目标片段";
             
             if (fT === "" && fB === "") {
-                document.getElementById('status-text').innerText = "载体已被线性化！请在右侧继续拼合。";
+                document.getElementById('status-text').innerText = "载体已被单刀切开（线性化）！";
+                this.showModal("载体已被线性化", "<b>检测到单刀切割</b><br><br>载体环已经断开并暴露出粘性/平末端，但并没有多余的片段被拿掉。请继续在左侧提取您想要插入的供体基因。");
             } else {
-                document.getElementById('status-text').innerText = "载体已切开！请在右侧预览图上【向上拖拽】拔出旧片段。";
+                document.getElementById('status-text').innerText = "载体已切开！请向上拖拽拔出旧片段。";
+                this.showModal("载体切割成功！", "<b>第二步：移出旧片段并提取新片段</b><br><br>1. 载体现在出现了缺口。请在右侧 3D 预览区<b>按住鼠标向上拖拽</b>，把切下来的废弃片段拔出来。<br>2. 拔出后，在左侧的直线供体序列上打上红线，提取您需要的目标基因。");
             }
         } else {
             let fT = tParts[1]; this.plasmidPanel.fragTop = fT ? fT + "-" : "";
             let fB = bParts[1]; this.plasmidPanel.fragBot = fB ? fB + "-" : "";
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.setStaticState("insert", 0.0);
-            document.getElementById('status-text').innerText = "新片段就绪！请在右侧预览图上【向下拖拽】嵌入载体。";
+            document.getElementById('status-text').innerText = "目标片段就绪！请向下拉拽将其嵌入。";
+            this.showModal("目标基因已就绪！", "<b>第三步：重组拼合</b><br><br>1. 您提取的新片段已经悬浮在右侧质粒的上方了。<br>2. 请<b>按住鼠标向下拖拽</b>将片段降入载体缺口。<br>3. 检查末端是否贴合，然后点击【检查并拼合】完成连接！");
         }
     }
 
+    // 【核心更新逻辑】：严格的验证判定与详尽的错误提示
     executeLigation() {
-        if (this.appStep === 1) return alert("⚠️ 请先完成切割和提取流程！");
+        if (this.appStep === 1) return this.showModal("流程未完成", "⚠️ 请先在左侧完成“载体切割”和“目标片段提取”流程！");
         let p = this.plasmidPanel;
         
         let isAway = (p.mode === "extract" && p.progress > 0.8) || (p.mode === "insert" && p.progress < 0.2);
         let isInside = (p.mode === "extract" && p.progress < 0.2) || (p.mode === "insert" && p.progress > 0.8);
 
+        let lenFT = getTokens(p.fragTop).length;
+        let lenFB = getTokens(p.fragBot).length;
+
         if (isAway) {
-            if (isComplementary(cleanSeq(p.vecLTop)+cleanSeq(p.vecRTop), cleanSeq(p.vecLBot)+cleanSeq(p.vecRBot))) {
+            // 场景 1：片段在最上方，检查载体自己能否闭合（自环化）
+            let vTopClean = cleanSeq(p.vecLTop) + cleanSeq(p.vecRTop);
+            let vBotClean = cleanSeq(p.vecLBot) + cleanSeq(p.vecRBot);
+
+            if (isComplementary(vTopClean, vBotClean)) {
                 p.startSelfLigationAnimation();
-                this.showModal("发现自连现象！", "载体自己闭合了。在现实实验中，我们需要使用去磷酸化酶来防止这种情况发生。");
-            } else alert("❌ 无法闭合：末端碱基不匹配！");
+                this.showModal(
+                    "⚠️ 发生载体自连！", 
+                    "<b>载体由于末端互补，自己闭合了环！</b><br><br>载体两端的粘性或平末端由于碱基完美配对，在连接酶作用下重新接合在了一起。拔出的片段由于无处可去，也可能首尾相连形成游离环。<br><br>💡 <b>真实实验贴士：</b>为了防止载体自连产生假阳性，通常我们会对切开的载体进行<b>去磷酸化处理（CIP/SAP）</b>，或采用<b>不相容的双酶切策略</b>。"
+                );
+            } else {
+                this.showModal(
+                    "💡 无法自连 (这是好事)", 
+                    "<b>载体末端碱基不互补，无法自行闭合！</b><br><br>这是非常棒的实验设计！您创造的不相容粘性末端成功地阻止了载体自连。现在请提取您的目标基因进行插入吧。"
+                );
+            }
         } else if (isInside) {
-            let lenFT = getTokens(p.fragTop).length;
-            let lenFB = getTokens(p.fragBot).length;
+            // 场景 2：片段被拉进缺口内部，检查重组
+
+            // 规则 A：空片段检查
+            if (lenFT === 0 && lenFB === 0) {
+                return this.showModal(
+                    "❌ 拼合失败：片段为空",
+                    "<b>未检测到目标片段插入！</b><br><br>您尝试嵌入的片段序列为空。请返回第二步（左侧面板），确保从供体序列中正确框选并切出了实际的碱基序列。"
+                );
+            }
+
+            // 规则 B：物理形状干涉检查
             let lOffTokens = getTokens(p.vecLBot).length - getTokens(p.vecLTop).length;
             let rOffTokens = getTokens(p.vecRTop).length - getTokens(p.vecRBot).length;
-            
             let fitsPhysically = (p.fragOffset === lOffTokens) && ((p.fragOffset + lenFB - lenFT) === rOffTokens);
 
-            let isComp = isComplementary(
-                cleanSeq(p.vecLTop)+cleanSeq(p.fragTop)+cleanSeq(p.vecRTop), 
-                cleanSeq(p.vecLBot)+cleanSeq(p.fragBot)+cleanSeq(p.vecRBot)
-            );
+            // 规则 C：碱基序列严格互补检查
+            let fullTop = cleanSeq(p.vecLTop) + cleanSeq(p.fragTop) + cleanSeq(p.vecRTop);
+            let fullBot = cleanSeq(p.vecLBot) + cleanSeq(p.fragBot) + cleanSeq(p.vecRBot);
+            let isComp = isComplementary(fullTop, fullBot);
 
             if (fitsPhysically && isComp) {
                 p.setStaticState(p.mode === "insert" ? "insert" : "extract", p.mode === "insert" ? 1.0 : 0.0);
-                this.showModal("🎉 重组成功！", "<b>太棒了！</b> 新基因已完美整合进载体中。<br><br>科学探索永无止境，希望你能继续保持这份好奇心！", "完成实验");
+                this.showModal(
+                    "🎉 重组质粒构建成功！", 
+                    "<b>恭喜！新基因已完美整合进载体中。</b><br><br>插入片段不仅物理外形与载体缺口契合，且接缝处的碱基（A-T, C-G）也满足了严格的互补配对原则。<br><br>在连接酶（Ligase）的帮助下，糖磷酸骨架已被修复。您顺利完成了一次完美的基因克隆！", 
+                    "完成实验"
+                );
+            } else if (!fitsPhysically) {
+                this.showModal(
+                    "❌ 拼合失败：末端形状干涉",
+                    "<b>发生了物理形状干涉！</b><br><br>插入片段的粘性末端形状（5'突出还是3'突出，以及突出的长度）与载体留下的缺口完全不一致。<br><br>💡 <b>建议：</b>尝试点击右侧面板的【🔄 旋转】或【↔️ 翻转】按钮调整片段方向，或者重置实验重新切出匹配的末端。"
+                );
             } else {
-                alert("❌ 拼合失败：碱基不配对或发生物理形状干涉！\n提示：请检查提取片段的粘性末端形状是否与载体缺口一致，或尝试使用【旋转】/【翻转】按钮调整。");
+                this.showModal(
+                    "❌ 拼合失败：碱基不互补",
+                    "<b>形状贴合，但碱基配对引发排斥！</b><br><br>虽然片段的末端长度刚好能塞进缺口，但连接处的具体序列无法遵循 A-T、C-G 的互补配对原则。<br><br>💡 <b>建议：</b>尝试使用【旋转/翻转】来调换两端，或者检查您最初的切割位点是否设计有误。"
+                );
             }
         } else {
-            alert("⚠️ 请将片段拖拽到最上方或缺口中心位置再点击拼合！");
+            this.showModal(
+                "⚠️ 位置不正确",
+                "请在右侧 3D 预览区将片段<b>彻底拖拽到最上方</b>（检查是否会发生载体自环），或者<b>完全拉入缺口中心</b>（检查是否能完成基因重组），然后再点击此按钮。"
+            );
         }
     }
 }
