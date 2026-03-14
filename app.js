@@ -635,13 +635,13 @@ class MainApp {
         if (this.currentMode === "act1") {
             this.circTop = autoFormatATCG(this.ACT1_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT1_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT1_LIN_TOP); this.linBot = autoFormatATCG(this.ACT1_LIN_BOT);
-            this.geneLabel = "基因A";
+            this.geneLabel = "基因B";
             document.getElementById('mode-badge').innerText = "当前模式: 活动一";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else if (this.currentMode === "act2") {
             this.circTop = autoFormatATCG(this.ACT2_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT2_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT2_LIN_TOP); this.linBot = autoFormatATCG(this.ACT2_LIN_BOT);
-            this.geneLabel = "基因B";
+            this.geneLabel = "人干扰素基因";
             document.getElementById('mode-badge').innerText = "当前模式: 活动二";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else {
