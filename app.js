@@ -77,7 +77,8 @@ class PlasmidPanel {
         this.vecLTop = ""; this.vecLBot = "";
         this.vecRTop = ""; this.vecRBot = "";
         this.fragOffset = 0; 
-        this.fragDirection = 1; 
+        this.fragDirection = 1; // 1 = 从左向右, -1 = 从右向左
+        this.geneLabel = ""; 
         
         this.setupInteractions();
     }
@@ -105,7 +106,7 @@ class PlasmidPanel {
                 let oldFTLen = getTokens(this.fragTop).length;
                 let oldFBLen = getTokens(this.fragBot).length;
                 this.fragOffset = this.fragOffset + oldFBLen - oldFTLen;
-                this.fragDirection *= -1; 
+                this.fragDirection *= -1; // 反转方向
 
                 let nT = cleanSeq(this.fragBot).split('').reverse().join('');
                 let nB = cleanSeq(this.fragTop).split('').reverse().join('');
@@ -133,7 +134,7 @@ class PlasmidPanel {
                 let oldFTLen = getTokens(this.fragTop).length;
                 let oldFBLen = getTokens(this.fragBot).length;
                 this.fragOffset = oldFTLen - oldFBLen - this.fragOffset;
-                this.fragDirection *= -1; 
+                this.fragDirection *= -1; // 反转方向
 
                 let nT = cleanSeq(this.fragTop).split('').reverse().join('');
                 let nB = cleanSeq(this.fragBot).split('').reverse().join('');
@@ -278,6 +279,7 @@ class PlasmidPanel {
         let vL_bot = vL - lOffTokens * deg;
         let vR_bot = vR - rOffTokens * deg;
 
+        // 渲染载体上的顺时针绿色箭头
         this.drawMorphedLayer(rMid, rOutE, vL, vR, this.vectorColor, 0, 0, rMid);
         this.drawMorphedLayer(rMid-w, rMid, vL_bot, vR_bot, this.vectorColor, 0, 0, rMid);
         
@@ -345,6 +347,7 @@ class PlasmidPanel {
                     this.drawMorphedText(this.fragBot, rInT, fBL, -1, "start", tMorph, currentDist, rMid);
                 }
                 
+                // 渲染提取片段的橙色方向指示箭头
                 let arrR = rOutE + 0.15;
                 this.ctx.beginPath();
                 let stepsArr = 20, stepA = (fTR - fTL) / stepsArr;
@@ -368,6 +371,17 @@ class PlasmidPanel {
                 this.ctx.moveTo(ex, ey);
                 this.ctx.lineTo(ex - 12*Math.cos(angle + Math.PI/6), ey - 12*Math.sin(angle + Math.PI/6));
                 this.ctx.stroke();
+
+                // 在3D箭头上方绘制基因标识名称 (仅在 geneLabel 不为空时显示)
+                if (this.geneLabel) {
+                    let textP = this.morphPoint(arrR + 0.12, 90, tMorph, currentDist, rMid);
+                    this.ctx.save();
+                    this.ctx.translate(this.CX + textP.x * this.SCALE, this.CY - textP.y * this.SCALE);
+                    this.ctx.fillStyle = "#e67e22";
+                    this.ctx.font = "bold 18px Arial";
+                    this.ctx.fillText(this.geneLabel, 0, 0);
+                    this.ctx.restore();
+                }
             }
             this.ctx.restore();
         }
@@ -375,7 +389,7 @@ class PlasmidPanel {
 }
 
 // ==========================================
-// 类：圆环选取器
+// 类：圆环选取器 (左侧步骤1)
 // ==========================================
 class CircularGeneSelector {
     constructor(canvasId) {
@@ -453,7 +467,7 @@ class CircularGeneSelector {
 }
 
 // ==========================================
-// 类：线性片段选取器
+// 类：线性片段选取器 (左侧步骤2)
 // ==========================================
 class GeneSegmentSelector {
     constructor(canvasId) {
@@ -466,6 +480,7 @@ class GeneSegmentSelector {
         this.unit = 22; 
         this.startX = 40; 
         this.cy = 250; 
+        this.geneLabel = ""; 
         
         const interactionEvent = e => {
             e.preventDefault(); 
@@ -568,6 +583,13 @@ class GeneSegmentSelector {
             this.ctx.strokeStyle = "#e67e22"; 
             this.ctx.lineWidth = 3; 
             this.ctx.stroke();
+
+            // 在2D箭头上方绘制基因标识名称
+            if (this.geneLabel) {
+                this.ctx.fillStyle = "#e67e22";
+                this.ctx.font = "bold 18px Arial";
+                this.ctx.fillText(this.geneLabel, (aStartX + aEndX) / 2, arrY - 15);
+            }
         }
     }
 }
@@ -577,8 +599,7 @@ class GeneSegmentSelector {
 // ==========================================
 class MainApp {
     constructor() {
-        // 【核心修改】引入 currentMode 状态机，清理旧常量
-        this.currentMode = "act1"; // 初始强制为活动一
+        this.currentMode = "act1"; 
 
         this.ACT1_CIRC_TOP = "G-G-A-T-C-C";
         this.ACT1_CIRC_BOT = "C-C-T-A-G-G";
@@ -592,13 +613,14 @@ class MainApp {
 
         this.circTop = ""; this.circBot = "";
         this.linTop = ""; this.linBot = "";
+        this.geneLabel = ""; 
 
         this.plasmidPanel = new PlasmidPanel('previewCanvas');
         this.circSelector = new CircularGeneSelector('circularCanvas');
         this.linSelector = new GeneSegmentSelector('linearCanvas');
         
         this.bindEvents(); 
-        this.loadModeData(); // 根据 currentMode 加载数据并 resetState
+        this.loadModeData(); 
     }
 
     showModal(title, body, btnText = "我知道了") {
@@ -609,29 +631,31 @@ class MainApp {
         overlay.style.display = 'flex';
     }
 
-    // 根据当前模式装载数据
     loadModeData() {
         if (this.currentMode === "act1") {
             this.circTop = autoFormatATCG(this.ACT1_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT1_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT1_LIN_TOP); this.linBot = autoFormatATCG(this.ACT1_LIN_BOT);
+            this.geneLabel = "基因A";
             document.getElementById('mode-badge').innerText = "当前模式: 活动一";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else if (this.currentMode === "act2") {
             this.circTop = autoFormatATCG(this.ACT2_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT2_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT2_LIN_TOP); this.linBot = autoFormatATCG(this.ACT2_LIN_BOT);
+            this.geneLabel = "基因B";
             document.getElementById('mode-badge').innerText = "当前模式: 活动二";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else {
+            this.geneLabel = "自定义基因";
             document.getElementById('mode-badge').innerText = "当前模式: 自定义";
             document.getElementById('mode-badge').style.backgroundColor = "#e67e22";
         }
+        
+        this.linSelector.geneLabel = this.geneLabel;
         this.resetState();
     }
 
     bindEvents() {
         document.getElementById('modal-close').addEventListener('click', () => document.getElementById('modal-overlay').style.display = 'none');
-        
-        // 【核心修改】点击重置按钮时，不再退回默认，而是重新加载当前模式的数据！
         document.getElementById('btn-reset').addEventListener('click', () => this.loadModeData());
         
         document.getElementById('btn-rotate-z').addEventListener('click', () => {
@@ -659,7 +683,7 @@ class MainApp {
         });
 
         document.getElementById('btn-reset-seq').addEventListener('click', () => {
-            this.loadModeData(); // 直接复用加载当前模式数据的逻辑
+            this.loadModeData(); 
         });
 
         document.getElementById('btn-apply-seq').addEventListener('click', () => {
@@ -672,9 +696,12 @@ class MainApp {
             document.getElementById('input-top-seq').value = tVal; 
             document.getElementById('input-bot-seq').value = bVal;
 
-            this.currentMode = "custom"; // 只要点击了应用，就切换到自定义模式
+            this.currentMode = "custom"; 
+            this.geneLabel = "自定义基因";
             document.getElementById('mode-badge').innerText = "当前模式: 自定义";
             document.getElementById('mode-badge').style.backgroundColor = "#e67e22";
+            
+            this.linSelector.geneLabel = this.geneLabel;
 
             if (this.appStep === 1) { 
                 this.circTop = tVal; 
@@ -716,6 +743,7 @@ class MainApp {
         this.plasmidPanel.fragOffset = 0;
         this.plasmidPanel.fragDirection = 1; 
         this.plasmidPanel.isClosedCircle = true; 
+        this.plasmidPanel.geneLabel = ""; // 【核心修复】载体原片段拉出时不显示名称
         
         this.plasmidPanel.setSequences("", "", `${vLT}`, `${vLB}`, `${vRT}`, `${vRB}`);
         this.plasmidPanel.setStaticState("extract", 0.0);
@@ -741,6 +769,7 @@ class MainApp {
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.isClosedCircle = false; 
             this.plasmidPanel.fragDirection = 1; 
+            this.plasmidPanel.geneLabel = ""; // 【核心修复】切割出的废弃原片段不挂载基因名
             
             this.plasmidPanel.setSequences(fT, fB, `5'-${tParts[0]}-`, `3'-${bParts[0]}-`, `${tParts[2]}-3'`, `${bParts[2]}-5'`);
             
@@ -767,6 +796,7 @@ class MainApp {
             let fB = bParts[1]; this.plasmidPanel.fragBot = fB ? fB + "-" : "";
             this.plasmidPanel.fragOffset = structuralOffset;
             this.plasmidPanel.fragDirection = 1;
+            this.plasmidPanel.geneLabel = this.geneLabel; // 【核心修复】新提取的片段挂载基因名称
             this.plasmidPanel.setStaticState("insert", 0.0);
             document.getElementById('status-text').innerText = "目标片段就绪！请向下拉拽将其嵌入。";
             this.showModal("提示", "新片段已就绪。请向下拖拽嵌入载体，并点击【拼合】按钮进行检查。");
