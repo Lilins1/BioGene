@@ -582,11 +582,11 @@ class MainApp {
 
         this.ACT1_CIRC_TOP = "G-G-A-T-C-C";
         this.ACT1_CIRC_BOT = "C-C-T-A-G-G";
-        this.ACT1_LIN_TOP = "A-A-G-C-T-T...A-T-G-C-T-T";
-        this.ACT1_LIN_BOT = "T-T-C-G-A-A...T-T-C-G-A-A";
+        this.ACT1_LIN_TOP = "-G-G-A-T-C-C...G-G-A-T-C-C-";
+        this.ACT1_LIN_BOT = "-C-C-T-A-G-G...C-C-T-A-G-G-";
 
-        this.ACT2_CIRC_TOP = "G-G-A-T-C-C";
-        this.ACT2_CIRC_BOT = "C-C-T-A-G-G";
+        this.ACT2_CIRC_TOP = "GGATCC...AAGCTT";
+        this.ACT2_CIRC_BOT = "CCTAGG...TTCGAA";
         this.ACT2_LIN_TOP = "GGATCC...AAGCTT";
         this.ACT2_LIN_BOT = "CCTAGG...TTCGAA";
 
