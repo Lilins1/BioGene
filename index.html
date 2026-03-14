@@ -3,29 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>基因克隆全流程仿真系统</title>
+    <title>模拟DNA分子重组</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="app">
         <div id="left-panel">
-            <div class="panel-header">
-                <h2 id="step-title">交互操作区 - 步骤 1：圆环切割</h2>
-                <p id="status-text">请在下方序列上点击（-）连字符位置选择切割位点（红线）</p>
+            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h2 id="step-title">交互操作区 - 步骤 1：圆环切割</h2>
+                    <p id="status-text">请在下方序列上点击（-）连字符位置选择切割位点（红线）</p>
+                </div>
+                <div id="mode-badge" style="background-color: #3498db; color: white; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold;">
+                    当前模式: 活动一
+                </div>
             </div>
             
-            <div class="sequence-inputs">
-                <div class="seq-row">
-                    <label>上链:</label>
-                    <input type="text" id="input-top-seq" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
+            <div class="sequence-inputs" style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #dee2e6;">
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">上链:</label>
+                    <input type="text" id="input-top-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
                 </div>
-                <div class="seq-row">
-                    <label>下链:</label>
-                    <input type="text" id="input-bot-seq" placeholder="输入基因序列..." />
+                <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">下链:</label>
+                    <input type="text" id="input-bot-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列..." />
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
                     <span id="input-step-label" style="font-size: 12px; color: #e67e22; font-weight: bold;">当前：载体序列</span>
                     <div style="display: flex; gap: 8px;">
+                        <button id="btn-act1" class="btn success" style="padding: 4px 10px; font-size: 12px; background-color: #27ae60;">活动一</button>
+                        <button id="btn-act2" class="btn success" style="padding: 4px 10px; font-size: 12px; background-color: #27ae60;">活动二</button>
                         <button id="btn-reset-seq" class="btn secondary" style="padding: 4px 10px; font-size: 12px;">恢复</button>
                         <button id="btn-apply-seq" class="btn primary" style="padding: 4px 10px; font-size: 12px;">应用</button>
                     </div>
@@ -33,8 +40,8 @@
             </div>
 
             <div id="selector-container">
-                <canvas id="circularCanvas" width="500" height="500"></canvas>
-                <canvas id="linearCanvas" width="500" height="500" style="display:none;"></canvas>
+                <canvas id="circularCanvas" width="700" height="500"></canvas>
+                <canvas id="linearCanvas" width="700" height="500" style="display:none;"></canvas>
             </div>
             <div class="control-bar">
                 <button id="btn-cut" class="btn primary">✂️ 执行切割 / 提取</button>
