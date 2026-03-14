@@ -747,7 +747,7 @@ class MainApp {
             this.updateLinearSelector();
             this.linSelector.show();
             
-            document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：提取目标片段";
+            document.getElementById('step-title').innerText = "交互操作区 - 步骤 2：切割目的基因";
             
             if (fT === "" && fB === "") {
                 document.getElementById('status-text').innerText = "载体已被切断！";
