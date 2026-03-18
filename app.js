@@ -620,20 +620,20 @@ class MainApp {
         if (this.currentMode === "act1a") {
             this.circTop = autoFormatATCG(this.ACT1A_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT1A_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT1A_LIN_TOP); this.linBot = autoFormatATCG(this.ACT1A_LIN_BOT);
-            this.geneLabel = "目的基因";
+            this.geneLabel = "含基因A的DNA片段";
             document.getElementById('mode-badge').innerText = "当前模式: 活动1.a";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else if (this.currentMode === "act1b") {
             this.circTop = autoFormatATCG(this.ACT1B_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT1B_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT1B_LIN_TOP); this.linBot = autoFormatATCG(this.ACT1B_LIN_BOT);
-            this.geneLabel = "目的基因";
+            this.geneLabel = "含基因B的DNA片段";
             document.getElementById('mode-badge').innerText = "当前模式: 活动1.b";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else if (this.currentMode === "act2") {
             this.circTop = autoFormatATCG(this.ACT2_CIRC_TOP); this.circBot = autoFormatATCG(this.ACT2_CIRC_BOT);
             this.linTop = autoFormatATCG(this.ACT2_LIN_TOP); this.linBot = autoFormatATCG(this.ACT2_LIN_BOT);
             this.geneLabel = "人干扰素基因";
-            document.getElementById('mode-badge').innerText = "当前模式: 活动二";
+            document.getElementById('mode-badge').innerText = "当前模式: 活动2";
             document.getElementById('mode-badge').style.backgroundColor = "#27ae60";
         } else {
             this.geneLabel = "自定义基因";
