@@ -8,7 +8,7 @@
 body { 
     background-color: #f0f2f5; 
     color: #333; 
-    overflow: hidden; 
+    /* 移除手机上强制不滚动的溢出隐藏，改为允许滑动 */
     height: 100dvh; 
     display: flex;
     padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
@@ -17,37 +17,36 @@ body {
 /* 默认：竖屏模式（上下布局，适配手机） */
 #app { 
     display: flex; 
-    flex-direction: column; /* 上下排列 */
+    flex-direction: column; 
     width: 100%; height: 100%; 
     padding: 10px; gap: 10px; 
+    overflow-y: auto; /* 核心：手机端允许上下滑动 */
+    -webkit-overflow-scrolling: touch; /* iOS顺滑滚动 */
 }
 
 #left-panel, #right-panel { 
     background-color: #fff; border-radius: 12px; 
     box-shadow: 0 4px 12px rgba(0,0,0,0.1); 
     display: flex; flex-direction: column; overflow: hidden; 
-    flex: 1; /* 竖屏时平分高度 */
-    min-height: 0; /* 防止内容撑破 flex 容器 */
-}
-
-/* 媒体查询：当屏幕宽度 > 高度时（横屏模式，适配电脑/平板） */
-@media (min-aspect-ratio: 1/1) {
-    #app {
-        flex-direction: row; /* 左右排列 */
-        padding: 15px; gap: 15px; 
-    }
-    #left-panel { flex: 4; }
-    #right-panel { flex: 6; }
+    flex: none; /* 在手机上由内容撑开 */
+    min-height: 520px; /* 保证手机上画布至少有合理的操作高度 */
 }
 
 .panel-header { padding: 10px 15px; background-color: #f8f9fa; border-bottom: 1px solid #dee2e6; }
+.header-flex { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 8px;}
 .panel-header h2 { font-size: 16px; color: #2c3e50; margin-bottom: 3px; }
 #status-text { font-size: 13px; color: #e67e22; font-weight: bold; }
+#mode-badge { background-color: #3498db; color: white; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold; white-space: nowrap; }
 
-.sequence-inputs { padding: 10px 15px; background: #fff; border-bottom: 1px solid #dee2e6; flex-shrink: 0;}
-.seq-row { display: flex; align-items: center; margin-bottom: 8px; }
-.seq-row label { width: 40px; font-weight: bold; font-size: 13px; color: #2c3e50; }
-.seq-row input { flex: 1; padding: 4px 8px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 13px; }
+/* 输入区自适应样式 */
+.sequence-inputs { padding: 15px 20px; background: #fff; border-bottom: 1px solid #dee2e6; flex-shrink: 0; }
+.input-row { display: flex; align-items: center; margin-bottom: 10px; gap: 8px; }
+.input-row label { width: 40px; font-weight: bold; font-size: 14px; color: #2c3e50; }
+.input-row input { flex: 1; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px; min-width: 0; } /* min-width 解决 flex 被挤爆 */
+
+.action-row { display: flex; flex-direction: column; gap: 10px; margin-top: 5px; }
+#input-step-label { font-size: 12px; color: #e67e22; font-weight: bold; }
+.btn-group { display: flex; flex-wrap: wrap; gap: 8px; }
 
 #selector-container, #preview-container { 
     flex: 1; display: flex; justify-content: center; align-items: center; 
@@ -57,8 +56,8 @@ body {
 canvas { 
     max-width: 100%; 
     max-height: 100%; 
-    object-fit: contain; /* 核心：保证 Canvas 缩放时不改变比例 */
-    touch-action: none; 
+    object-fit: contain; 
+    touch-action: none; /* 保证画布上的操作不触发浏览器上下滚动 */
     cursor: crosshair; 
 }
 
@@ -67,12 +66,14 @@ canvas {
     display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
 }
 
-.btn { padding: 8px 16px; font-size: 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: transform 0.1s, opacity 0.2s; }
+.btn { padding: 8px 16px; font-size: 14px; font-weight: bold; border: none; border-radius: 6px; cursor: pointer; transition: transform 0.1s, opacity 0.2s; text-align: center; }
 .btn:active { transform: scale(0.96); }
 .btn.primary { background-color: #3498db; color: white; }
 .btn.secondary { background-color: #95a5a6; color: white; }
 .btn.success { background-color: #2ecc71; color: white; }
 .btn.danger { background-color: #e74c3c; color: white; }
+.btn-group .btn { flex: 1 1 auto; padding: 6px 10px; font-size: 13px; } /* 手机上按钮均分剩余宽度 */
+.full-width-mobile { flex: 1 1 100%; }
 
 /* 引导模态框 */
 #modal-overlay {
@@ -88,3 +89,21 @@ canvas {
 @keyframes modalPop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 #modal-title { font-size: 20px; color: #2c3e50; margin-bottom: 12px; }
 #modal-body { font-size: 15px; line-height: 1.5; color: #555; margin-bottom: 20px; }
+
+/* ========================================================= */
+/* 媒体查询：当屏幕宽度 > 高度时（横屏模式，适配电脑/平板） */
+/* ========================================================= */
+@media (min-aspect-ratio: 1/1) {
+    body { overflow: hidden; } /* 大屏幕恢复完全无滚动无缝贴合 */
+    #app {
+        flex-direction: row; /* 左右排列 */
+        padding: 15px; gap: 15px; 
+        overflow-y: hidden;
+    }
+    #left-panel { flex: 4; min-height: 0; }
+    #right-panel { flex: 6; min-height: 0; }
+    
+    .action-row { flex-direction: row; justify-content: space-between; align-items: center; gap: 0; }
+    .btn-group .btn { flex: 0 1 auto; padding: 6px 10px; } /* 恢复紧凑按钮形态 */
+    .full-width-mobile { flex: 0 1 auto; }
+}

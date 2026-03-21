@@ -9,33 +9,31 @@
 <body>
     <div id="app">
         <div id="left-panel">
-            <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div class="panel-header header-flex">
                 <div>
                     <h2 id="step-title">交互操作区 - 步骤 1：圆环切割</h2>
                     <p id="status-text">请在下方序列上点击（-）连字符位置选择切割位点（红线）</p>
                 </div>
-                <div id="mode-badge" style="background-color: #3498db; color: white; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: bold;">
-                    当前模式: 活动1.a
-                </div>
+                <div id="mode-badge">当前模式: 活动1.a</div>
             </div>
             
-            <div class="sequence-inputs" style="padding: 15px 20px; background: #fff; border-bottom: 1px solid #dee2e6;">
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">上链:</label>
-                    <input type="text" id="input-top-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
+            <div class="sequence-inputs">
+                <div class="input-row">
+                    <label>上链:</label>
+                    <input type="text" id="input-top-seq" placeholder="输入基因序列 (如: ATCGeneATCG)..." />
                 </div>
-                <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label style="width: 50px; font-weight: bold; font-size: 14px; color: #2c3e50;">下链:</label>
-                    <input type="text" id="input-bot-seq" style="flex: 1; padding: 6px 10px; border: 1px solid #ccc; border-radius: 4px; font-family: monospace; font-size: 14px;" placeholder="输入基因序列..." />
+                <div class="input-row">
+                    <label>下链:</label>
+                    <input type="text" id="input-bot-seq" placeholder="输入基因序列..." />
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                    <span id="input-step-label" style="font-size: 12px; color: #e67e22; font-weight: bold;">当前：载体序列</span>
-                    <div style="display: flex; gap: 8px;">
-                        <button id="btn-act1a" class="btn success" style="padding: 4px 10px; font-size: 12px; background-color: #27ae60;">活动1.a</button>
-                        <button id="btn-act1b" class="btn success" style="padding: 4px 10px; font-size: 12px; background-color: #27ae60;">活动1.b</button>
-                        <button id="btn-act2" class="btn success" style="padding: 4px 10px; font-size: 12px; background-color: #27ae60;">活动2</button>
-                        <button id="btn-reset-seq" class="btn secondary" style="padding: 4px 10px; font-size: 12px;">恢复</button>
-                        <button id="btn-apply-seq" class="btn primary" style="padding: 4px 10px; font-size: 12px;">应用</button>
+                <div class="action-row">
+                    <span id="input-step-label">当前：载体序列</span>
+                    <div class="btn-group">
+                        <button id="btn-act1a" class="btn success">活动1.a</button>
+                        <button id="btn-act1b" class="btn success">活动1.b</button>
+                        <button id="btn-act2" class="btn success">活动2</button>
+                        <button id="btn-reset-seq" class="btn secondary">恢复</button>
+                        <button id="btn-apply-seq" class="btn primary">应用</button>
                     </div>
                 </div>
             </div>
@@ -45,13 +43,13 @@
                 <canvas id="linearCanvas" width="700" height="500" style="display:none;"></canvas>
             </div>
             <div class="control-bar">
-                <button id="btn-cut" class="btn primary">✂️ 执行切割</button>
+                <button id="btn-cut" class="btn primary full-width-mobile">✂️ 执行切割</button>
             </div>
         </div>
 
         <div id="right-panel">
             <div class="panel-header">
-                <h2>预览 (拖拽鼠标/手指控制片段)</h2>
+                <h2>预览 (上下拖拽鼠标/手指以移动片段)</h2>
             </div>
             <div id="preview-container">
                 <canvas id="previewCanvas" width="800" height="800"></canvas>

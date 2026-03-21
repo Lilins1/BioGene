@@ -64,7 +64,7 @@ class PlasmidPanel {
         this.mode = "extract";
         this.progress = 0.0;
         this.extractDistance = 1.0; 
-        this.insertDistance = 0.75; // 【要求2】插入过程中的片段高度降低1/4
+        this.insertDistance = 0.85; 
         
         this.rotationAngleZ = 0.0; 
         this.isRotating = false;
@@ -316,11 +316,10 @@ class PlasmidPanel {
                     this.drawMorphedText(this.fragBot, rInT, fBL, -1, "start", tMorph, currentDist, rMid);
                 }
                 
-                // 【要求3】缩短代表基因方向的箭头长度到原来的一半
                 let arrR = rOutE + 0.15;
                 let arrowSpan = fTR - fTL; 
                 let midA = (fTL + fTR) / 2.0;
-                let arrTL = midA - arrowSpan / 4.0; // 截取居中的一半长度
+                let arrTL = midA - arrowSpan / 4.0; 
                 let arrTR = midA + arrowSpan / 4.0; 
 
                 this.ctx.beginPath();
@@ -341,7 +340,7 @@ class PlasmidPanel {
                 let angle = Math.atan2(ey - py2, ex - px2);
                 this.ctx.beginPath();
                 this.ctx.moveTo(ex, ey);
-                this.ctx.lineTo(ex - 6*Math.cos(angle - Math.PI/6), ey - 6*Math.sin(angle - Math.PI/6)); // 箭头调整到一半 6px
+                this.ctx.lineTo(ex - 6*Math.cos(angle - Math.PI/6), ey - 6*Math.sin(angle - Math.PI/6)); 
                 this.ctx.moveTo(ex, ey);
                 this.ctx.lineTo(ex - 6*Math.cos(angle + Math.PI/6), ey - 6*Math.sin(angle + Math.PI/6));
                 this.ctx.stroke();
@@ -351,7 +350,8 @@ class PlasmidPanel {
                     this.ctx.save();
                     this.ctx.translate(this.CX + textP.x * this.SCALE, this.CY - textP.y * this.SCALE);
                     this.ctx.fillStyle = "#e67e22";
-                    this.ctx.font = "bold 18px Arial";
+                    // 【修改项】：字体放大至 24px
+                    this.ctx.font = "bold 24px Arial";
                     this.ctx.fillText(this.geneLabel, 0, 0);
                     this.ctx.restore();
                 }
@@ -548,7 +548,6 @@ class GeneSegmentSelector {
             let aStartX = this.startX;
             let aEndX = this.startX + (seqTop.length - 1) * this.unit;
             
-            // 【要求3】缩短代表基因方向的箭头长度到原来的一半
             let midX = (aStartX + aEndX) / 2;
             let halfSpan = (aEndX - aStartX) / 4; 
             let arrStartX = midX - halfSpan;
@@ -557,7 +556,7 @@ class GeneSegmentSelector {
             this.ctx.beginPath();
             this.ctx.moveTo(arrStartX, arrY);
             this.ctx.lineTo(arrEndX, arrY);
-            this.ctx.lineTo(arrEndX - 6, arrY - 4); // 箭头头部尺寸变小
+            this.ctx.lineTo(arrEndX - 6, arrY - 4); 
             this.ctx.moveTo(arrEndX, arrY);
             this.ctx.lineTo(arrEndX - 6, arrY + 4);
             this.ctx.strokeStyle = "#e67e22"; 
@@ -566,8 +565,9 @@ class GeneSegmentSelector {
 
             if (this.geneLabel) {
                 this.ctx.fillStyle = "#e67e22";
-                this.ctx.font = "bold 18px Arial";
-                this.ctx.fillText(this.geneLabel, midX, arrY - 15);
+                // 【修改项】：字体放大至 24px 并稍微上移以避开箭头
+                this.ctx.font = "bold 24px Arial";
+                this.ctx.fillText(this.geneLabel, midX, arrY - 20);
             }
         }
     }
@@ -580,7 +580,6 @@ class MainApp {
     constructor() {
         this.currentMode = "act1a"; 
 
-        // 【要求4】新增活动1.a 及原活动修改为活动1.b
         this.ACT1A_CIRC_TOP = "G-G-A-T-C-C";
         this.ACT1A_CIRC_BOT = "C-C-T-A-G-G";
         this.ACT1A_LIN_TOP = "A-A-G-C-T-T...A-A-G-C-T-T";
@@ -752,7 +751,6 @@ class MainApp {
         let structuralOffset = stB - stT; 
 
         if (this.appStep === 1) {
-            // 【要求1】直接丢弃载体切割的废弃片段，不赋予 fragTop/Bot 并且将动画状态初始化至 insert准备阶段
             let fT = tParts[1]; 
             let fB = bParts[1]; 
             
@@ -762,7 +760,7 @@ class MainApp {
             this.plasmidPanel.geneLabel = ""; 
             
             this.plasmidPanel.setSequences("", "", `5'-${tParts[0]}-`, `3'-${bParts[0]}-`, `${tParts[2]}-3'`, `${bParts[2]}-5'`);
-            this.plasmidPanel.setStaticState("insert", 0.0); // 初始化到片段即将插入的状态位置
+            this.plasmidPanel.setStaticState("insert", 0.0); 
 
             this.appStep = 2; 
             document.getElementById('input-step-label').innerText = "当前操作：供体片段序列";
